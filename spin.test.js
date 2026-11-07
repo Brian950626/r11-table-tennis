@@ -80,6 +80,19 @@ const hSmallSide = hitWith(0, 0.6), hSideR = hitWith(0, 2.2), hSideL = hitWith(0
 ok(hSmallSide.side === 0, '小幅左右移動只改方向，不帶側旋');
 ok(hSideR.side > 0.5 && hSideL.side < -0.5, '快速往右揮 → 往右彎的側旋；往左揮 → 往左彎');
 
+// 雙人模式的玩家 2 站在另一端：他的右手邊是 -x、往網子是 +z，旋轉也要照他的方向
+function hitWith2(vz, vx) {
+  const x = E.createGame('normal', { rng: () => 0.5, mode: 'pvp' });
+  x.phase = 'rally'; x.hitter = 'p'; x.recvBounced = true;
+  Object.assign(x.ball, { x: 0, y: 0.25, z: -1.6, vx: 0, vy: -0.5, vz: -4, spinTop: 0, spinSide: 0 });
+  Object.assign(x.pad2, { x: 0, z: -1.6, vz, vx });
+  E._test.playerHit(x, 'r');
+  return { type: x.lastShot.r, top: x.ball.spinTop, side: x.ball.spinSide, land: E.predictBounce(x, 'p') };
+}
+const p2SideR = hitWith2(0, -2.2), p2Loop = hitWith2(0.7, 0), p2Chop = hitWith2(-0.55, 0);
+ok(p2SideR.side < -0.5 && p2SideR.land && p2SideR.land.x < 0, `雙人模式玩家 2 往自己右手邊快速揮 → 球往他的右手邊（-x）彎（側旋 ${f2(p2SideR.side)}）`);
+ok(p2Loop.type === 'loop' && p2Loop.top > 0.4 && p2Chop.type === 'chop' && p2Chop.top < -0.4, '雙人模式玩家 2 往網子輕推 → 上旋；往後輕拉 → 下旋');
+
 console.log('接旋轉球');
 const inBack = { top: -0.5, side: 0 }, inTop = { top: 0.5, side: 0 }, inSide = { top: 0, side: 0.6 };
 const rFlatBack = hitWith(0, 0, inBack), rLoopBack = hitWith(-0.7, 0, inBack), rFlatTop = hitWith(0, 0, inTop), rChopTop = hitWith(0.55, 0, inTop);
