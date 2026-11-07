@@ -651,6 +651,8 @@ button { font: inherit; color: inherit; }
     const st = e.deuce ? 'Deuce 平分' : e.gamePoint === 'p' ? '你的賽末點' : e.gamePoint === 'r' ? 'R-11 賽末點' : '';
     $('status').textContent = st;
     if (!e.initial && st) queued = [st, e.deuce ? '要連拿 2 分才能贏' : e.gamePoint === 'p' ? '再拿 1 分就贏了' : '守住這一分', 'neutral', 1200];
+    // the point banner (1.4 s) usually hides before serveReady (dead time 1.55 s), so show it now instead of waiting
+    if (queued && $('banner').hidden) { const q = queued; queued = null; banner(q[0], q[1], q[2], q[3]); }
   }
   function onGameOver(e) {
     const win = e.winner === 'p';
