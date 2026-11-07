@@ -5,7 +5,7 @@
 ## 指令
 
 - `npm test`：跑全部測試（需要 Node.js 18 以上，不用 `npm install`）
-- 單獨跑：`node rules.test.js`、`node selfplay.test.js`、`node skins.test.js`
+- 單獨跑：`node rules.test.js`、`node selfplay.test.js`、`node skins.test.js`、`node records.test.js`
 - 看畫面：用瀏覽器打開 `index.html`，不需要伺服器
 
 ## 檔案分工
@@ -13,9 +13,10 @@
 | 檔案 | 負責 |
 | --- | --- |
 | `engine.js` | 球的物理、比賽規則、機器人 AI。**不能碰 DOM**，Node 測試會直接 `require` 它 |
+| `records.js` | 成績紀錄、統計、排行榜和 `localStorage` 讀寫（掛在 `window.R11Records`）。**不能碰 DOM**，`records.test.js` 會直接 `require` 它 |
 | `skins.js` | 機器人造型（經典、櫻、焰鋼、喵喵、影），只負責畫機器人 |
 | `index.html` | 畫面繪製、觸控／滑鼠／鍵盤操控、音效、選單、計分板；CSS 和主程式都在這個檔案裡 |
-| `*.test.js` | 規則、自動對打、造型三組測試 |
+| `*.test.js` | 規則、自動對打、造型、成績紀錄四組測試 |
 | `.github/workflows/test.yml` | push 到 `main` 和每個 Pull Request 都會自動跑 `npm test` |
 
 ## 座標
