@@ -165,7 +165,8 @@ button { font: inherit; color: inherit; }
 .rec-confirm { display: grid; gap: 10px; border: 1px solid var(--coral); border-radius: 10px; padding: 12px; background: rgba(255, 122, 107, 0.08); }
 .rec-confirm p { margin: 0; font-size: 14px; line-height: 1.6; }
 .rec-danger { font-weight: 900; font-size: 15px; padding: 11px; border-radius: 10px; border: 0; background: var(--coral); color: #2a0702; cursor: pointer; }
-.end-rec { margin: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 10px; font-size: 14px; font-weight: 700; line-height: 1.5; color: var(--teal); text-align: center; }
+.end-rec { margin: 0; display: grid; justify-items: center; gap: 2px; font-size: 14px; font-weight: 700; line-height: 1.5; color: var(--teal); text-align: center; }
+.end-rec > span { display: grid; justify-items: center; }
 .rec-link { border: 0; background: none; padding: 6px 2px; color: var(--accent); font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 @media (max-height: 560px) { .card { gap: 11px; padding: 16px; } .card h1 { font-size: 26px; } .lede { font-size: 13px; } }
 @media (prefers-reduced-motion: reduce) { .banner.show, .callout.show, .flip.anim span { animation: none; } }
@@ -978,18 +979,21 @@ button { font: inherit; color: inherit; }
       diff: game.diff.key, skin: skinId, name: recStore.getName(),
       p: game.score.p, r: game.score.r, secs: game.time, rally: game.longest,
     });
-    let msg = '';
-    if (res.game && !res.saved) msg = '這個瀏覽器不能存資料，這局沒有記錄。';
+    const parts = [];
+    if (res.game && !res.saved) parts.push('這個瀏覽器不能存資料，這局沒有記錄。');
     else if (res.game) {
-      const a = REC.achievements(res.prev, res.game), d = recDiffName(res.game.diff), parts = [];
+      const a = REC.achievements(res.prev, res.game), d = recDiffName(res.game.diff);
       if (a.firstWin) parts.push(`第一次在「${d}」贏過 R-11！`);
       else if (a.bestMargin) parts.push(`新紀錄：「${d}」最大分差 ${res.game.p}:${res.game.r}`);
       if (a.longestRally) parts.push(`新紀錄：最長來回 ${res.game.rally} 拍`);
       if (a.streak >= 2) parts.push(a.bestStreak ? `${a.streak} 連勝，最高紀錄！` : `目前 ${a.streak} 連勝`);
-      msg = parts.length ? parts.slice(0, 2).join('　') : '這局已記錄到成績。';
+      if (!parts.length) parts.push('這局已記錄到成績。');
     }
-    $('endRecText').textContent = msg;
-    $('endRec').hidden = !msg;
+    // 每句各自一行，不會在字中間斷行
+    const box = $('endRecText');
+    box.textContent = '';
+    for (const t of parts.slice(0, 2)) box.append(recEl('span', '', t));
+    $('endRec').hidden = !parts.length;
   }
 
   function renderRecords() {
