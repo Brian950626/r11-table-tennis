@@ -67,6 +67,21 @@ for (let k = 0; k < 400 && lets < 3; k++) {
 }
 ok(lets > 0 && scoreKept, '發球擦網落在對面 → 重發，比分不變');
 
+// 玩家站在各種位置發球（包含左右最邊邊），發球失誤不能太多
+let seed = 7;
+const lcg = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+let serves = 0, serveFaults = 0;
+for (let i = 0; i < 15; i++) for (let j = 0; j < 6; j++) {
+  g = E.createGame('normal', { rng: lcg }); g.events.length = 0;
+  g.pad.tx = E.PAD.xMin + ((E.PAD.xMax - E.PAD.xMin) * i) / 14; g.pad.tz = E.PAD.zMin + ((E.PAD.zMax - E.PAD.zMin) * j) / 5;
+  for (let k = 0; k < 60; k++) E.update(g, 1 / 60);
+  E.serve(g); serves++;
+  const p = pointOf(runUntilPoint(g, 3));
+  if (p && p.reason === 'serveFault') serveFaults++;
+}
+ok(serveFaults <= serves * 0.05, `玩家從各種站位發球，失誤 ${serveFaults}／${serves} 球（不超過 5%）`);
+E.setRng(Math.random);
+
 console.log('比賽結束條件');
 const finish = (p, r, winner) => { const x = E.createGame('normal'); x.score.p = p; x.score.r = r; x.phase = 'rally'; x.hitter = 'p'; E._test.point(x, winner, 'miss'); return x.winner; };
 ok(finish(10, 9, 'p') === 'p', '11:9 結束');
