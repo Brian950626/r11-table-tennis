@@ -138,10 +138,12 @@
     g.events.push({ kind: 'serveReady', server: g.server, deuce: sp >= 10 && sp === sr, gamePoint: gp, initial: !!initial });
   }
 
+  // 發球的路線是直線，球從桌子寬度外面拋，第一跳就會落在桌外，所以拋球位置限制在桌子寬度內
+  const SERVE_X = HX - 0.06;
   function holdBall(g) {
     const b = g.ball;
-    if (g.server === 'p') { b.x = clamp(g.pad.x - 0.13, -1.0, 1.0); b.z = Math.max(g.pad.z, 1.45) - 0.02; b.y = 0.12; }
-    else { b.x = clamp(g.robot.x + 0.13, -1.0, 1.0); b.z = Math.min(g.robot.z, -1.45) + 0.02; b.y = 0.12; }
+    if (g.server === 'p') { b.x = clamp(g.pad.x - 0.13, -SERVE_X, SERVE_X); b.z = Math.max(g.pad.z, 1.45) - 0.02; b.y = 0.12; }
+    else { b.x = clamp(g.robot.x + 0.13, -SERVE_X, SERVE_X); b.z = Math.min(g.robot.z, -1.45) + 0.02; b.y = 0.12; }
   }
 
   function updateAim(g) {
