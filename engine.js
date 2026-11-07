@@ -15,6 +15,42 @@
     hard: { key: 'hard', name: '困難', ts: 0.63, pReach: 0.155, rReach: 0.17, rSpeed: 2.7, rZ: 0.7, rReact: 0.1, rNoise: 0.015, rErr: 0.03, rErrK: 0.14, rTf: [0.38, 0.46], spread: 0.6, corner: 0.8, smash: 0.55, drop: 0.12, rZmin: -0.9, hint: false },
   };
 
+  // 打法個性：每個造型一種（skins.js 的 style），疊在難度上，只改 R-11 回球和發球的選擇。
+  //   smash／drop／corner：扣殺、放短、打大角度的機率，先乘 xxxK 再加 xxxAdd（簡單難度只加一半）
+  //   spread：打中路時左右範圍的倍數　tempo：回球飛行時間的倍數（小於 1 球比較快）　err：失誤率的倍數
+  //   dropZ：玩家站得比這裡遠（公尺）才會放短，預設 1.6
+  const STYLES = {
+    allround: { key: 'allround', name: '均衡' },
+    smash: { key: 'smash', name: '愛扣殺', smashK: 1.5, smashAdd: 0.3, tempo: 0.95, err: 1.15 },
+    drop: { key: 'drop', name: '愛放短', dropK: 1.5, dropAdd: 0.22, dropZ: 1.35, smashK: 0.6, spread: 0.85 },
+    angle: { key: 'angle', name: '愛打大角度', cornerK: 1.2, cornerAdd: 0.4, spread: 1.3, err: 1.1 },
+    steady: { key: 'steady', name: '穩定不失誤', err: 0.55, smashK: 0.4, cornerK: 0.5, spread: 0.8, tempo: 1.05 },
+    speed: { key: 'speed', name: '快攻', tempo: 0.86, err: 1.2, smashK: 1.1, spread: 1.1 },
+    trick: { key: 'trick', name: '變化多端', dropK: 1.3, dropAdd: 0.12, dropZ: 1.45, cornerK: 1.1, cornerAdd: 0.2, smashK: 0.8, spread: 1.2, err: 1.05 },
+    lob: { key: 'lob', name: '高吊守備', tempo: 1.1, err: 0.5, smashK: 0.15, dropK: 0.5, spread: 1.3 },
+  };
+  let defaultStyle = 'allround';
+  // 難度參數疊上打法個性，回傳新的一份（不改 DIFFS）
+  function styled(d, s) {
+    const w = d.key === 'easy' ? 0.5 : 1;
+    const mix = (k, max) => clamp(d[k] * (s[k + 'K'] || 1) + (s[k + 'Add'] || 0) * w, 0, max);
+    return Object.assign({}, d, {
+      smash: mix('smash', 0.9), drop: mix('drop', 0.6), corner: mix('corner', 0.95),
+      spread: clamp(d.spread * (s.spread || 1), 0.15, 0.66), rTf: d.rTf.map((t) => t * (s.tempo || 1)),
+      rErr: d.rErr * (s.err || 1), rErrK: d.rErrK * (s.err || 1), dropZ: s.dropZ || 1.6, style: s.key,
+    });
+  }
+  // g.style 是這局的打法，g.diff 變成「難度疊上打法」的參數（key、name 還是難度的）
+  function applyStyle(g, key) {
+    g.style = STYLES[key] || STYLES.allround;
+    g.diff = styled(DIFFS[g.diff.key] || DIFFS.normal, g.style);
+  }
+  // 換造型時呼叫：之後 createGame 沒指定 opts.style 就用這個打法；有給 g 就連這局一起換
+  function setStyle(key, g) {
+    defaultStyle = STYLES[key] ? key : 'allround';
+    if (g) applyStyle(g, defaultStyle);
+  }
+
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   let rng = Math.random;
   const rand = (a, b) => a + (b - a) * rng();
@@ -120,6 +156,7 @@
       aim: { x: 0, z: -0.8 }, serveData: null, lastShot: { p: 'drive', r: 'drive' },
       hint: null, winner: null, events: [], time: 0,
     };
+    applyStyle(g, opts.style || defaultStyle);
     resetForServe(g, true);
     return g;
   }
@@ -296,7 +333,7 @@
     } else {
       let xt, zt, Tf;
       if (b.y > 0.3 && rng() < d.smash) { type = 'smash'; Tf = rand(0.3, 0.34); zt = rand(0.95, 1.15); xt = awayX(); spin = 'top'; }
-      else if (rng() < d.drop && p.z > 1.6) { type = 'drop'; Tf = 0.56; zt = rand(0.3, 0.42); xt = rand(-0.4, 0.4); spin = 'back'; }
+      else if (rng() < d.drop && p.z > (d.dropZ || 1.6)) { type = 'drop'; Tf = 0.56; zt = rand(0.3, 0.42); xt = rand(-0.4, 0.4); spin = 'back'; }
       else { Tf = rand(d.rTf[0], d.rTf[1]); zt = rand(0.55, 1.15); xt = d.corner > 0 && rng() < d.corner ? awayX() : rand(-d.spread, d.spread); }
       v = aimVelocity(b, xt, zt, Tf);
       for (let n = 0; n < 14 && netMargin(b, v) < 0.03; n++) { Tf += 0.03; v = aimVelocity(b, xt, zt, Tf); }
@@ -419,6 +456,6 @@
     p.y += (ty - p.y) * (1 - Math.exp(-dt * 16));
   }
 
-  const API = { _test: { point, resetForServe, afterPoint }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, setRng: (f) => { rng = f; } };
+  const API = { _test: { point, resetForServe, afterPoint }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, setRng: (f) => { rng = f; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.PingPong = API;
 })(this);
