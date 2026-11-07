@@ -416,6 +416,7 @@ button { font: inherit; color: inherit; }
       f0 = Math.min((W - 16) / 2.6, (H - 2 * m) / 4.3);
       cx0 = W / 2; cy0 = H / 2;
     }
+    f0 = Math.max(1, f0); // a page opened in a hidden tab can start at 1×1 px; never let the scale go negative
     f = f0 * cam.y;
   }
   function fitCamera() {
@@ -433,7 +434,7 @@ button { font: inherit; color: inherit; }
       maxX = Math.max(maxX, Math.abs(dx / d)); tmin = Math.min(tmin, u / d); tmax = Math.max(tmax, u / d);
     }
     const mt = clamp(H * 0.15, 92, 128), mb = clamp(H * 0.1, 58, 96);
-    f = Math.min((W / 2 - 8) / maxX, (H - mt - mb) / (tmax - tmin));
+    f = Math.max(1, Math.min((W / 2 - 8) / maxX, (H - mt - mb) / (tmax - tmin)));
     cx0 = W / 2; cy0 = (mt + H - mb) / 2 + (f * (tmax + tmin)) / 2;
   }
 
