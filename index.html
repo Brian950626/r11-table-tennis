@@ -123,6 +123,50 @@ button { font: inherit; color: inherit; }
 .skin-desc { margin: -8px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); min-height: 1.5em; }
 .skin-desc b { color: var(--fg); font-weight: 700; }
 .howto-wrap { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+/* 成績與排行榜（邏輯在 records.js） */
+.rec-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rec-open { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px 0 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.rec-open svg { width: 15px; height: 15px; fill: var(--accent); }
+.rec-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.rec-head .kicker { margin-bottom: 4px; }
+.rec-x { flex: none; width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); font-size: 24px; line-height: 1; cursor: pointer; }
+.rec-off { margin: 0; font-size: 13px; line-height: 1.6; color: var(--coral); border: 1px solid rgba(255, 122, 107, 0.45); border-radius: 8px; padding: 8px 11px; }
+.rec-field { display: grid; gap: 6px; }
+.rec-field > span { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); }
+.rec-field input { width: 100%; min-width: 0; font: inherit; font-size: 16px; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; user-select: text; -webkit-user-select: text; }
+.rec-field input:disabled { opacity: 0.55; }
+.rec-hint, .rec-foot { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.rec-line { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--muted); overflow-wrap: anywhere; }
+.rec-line b { color: var(--fg); font-family: var(--f-num); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rec-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.rec-tabs button { border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 8px 4px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.rec-tabs button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: #2a2a3e; }
+.rec-board { display: grid; gap: 10px; }
+.rec-cap { margin: 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+.rec-list { list-style: none; margin: 0; padding: 0; }
+.rec-list li { display: grid; grid-template-columns: 1.4em minmax(0, 1fr) auto auto; gap: 4px 10px; align-items: baseline; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.rec-list li:first-child { border-top: 1px solid var(--line); }
+.rec-rk { font-family: var(--f-num); font-weight: 800; color: var(--muted); text-align: center; }
+.rec-list li:first-child .rec-rk { color: var(--accent); }
+.rec-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: isolate; }
+.rec-sc { font-family: var(--f-num); font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; }
+.rec-dt { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rec-recent li { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+.rec-res { font-size: 12.5px; font-weight: 900; padding: 1px 7px; border-radius: 5px; }
+.rec-res.win { background: var(--accent); color: var(--accent-fg); }
+.rec-res.lose { color: var(--coral); box-shadow: inset 0 0 0 1px var(--line); }
+.rec-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--muted); }
+.rec-sub { grid-column: 2 / -1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.rec-best { margin: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.rec-best div { display: grid; grid-template-columns: 4.8em minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.rec-best dt { color: var(--muted); }
+.rec-best dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bRecClear:disabled { opacity: 0.45; cursor: default; }
+.rec-confirm { display: grid; gap: 10px; border: 1px solid var(--coral); border-radius: 10px; padding: 12px; background: rgba(255, 122, 107, 0.08); }
+.rec-confirm p { margin: 0; font-size: 14px; line-height: 1.6; }
+.rec-danger { font-weight: 900; font-size: 15px; padding: 11px; border-radius: 10px; border: 0; background: var(--coral); color: #2a0702; cursor: pointer; }
+.end-rec { margin: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 10px; font-size: 14px; font-weight: 700; line-height: 1.5; color: var(--teal); text-align: center; }
+.rec-link { border: 0; background: none; padding: 6px 2px; color: var(--accent); font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 @media (max-height: 560px) { .card { gap: 11px; padding: 16px; } .card h1 { font-size: 26px; } .lede { font-size: 13px; } }
 @media (prefers-reduced-motion: reduce) { .banner.show, .callout.show, .flip.anim span { animation: none; } }
 </style>
@@ -151,7 +195,10 @@ button { font: inherit; color: inherit; }
 
   <div class="overlay" id="menu">
     <div class="card">
-      <p class="kicker">TABLE TENNIS · 11 POINTS</p>
+      <div class="rec-top">
+        <p class="kicker">TABLE TENNIS · 11 POINTS</p>
+        <button class="rec-open" id="bRecords" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="8" width="3.6" height="7" rx="1"/><rect x="6.2" y="4" width="3.6" height="11" rx="1"/><rect x="11.4" y="1" width="3.6" height="14" rx="1"/></svg>成績</button>
+      </div>
       <h1>對手：機器人 <span class="num">R-11</span></h1>
       <p class="lede">一局 11 分。移動球拍接球，擊球那一下怎麼動，球就怎麼飛。</p>
       <p class="label">難度</p>
@@ -208,14 +255,54 @@ button { font: inherit; color: inherit; }
         <div><b id="stHits">0</b><span>你的擊球數</span></div>
       </div>
       <p class="lede" id="endNote"></p>
+      <p class="end-rec" id="endRec" hidden><span id="endRecText"></span><button class="rec-link" id="bEndRec" type="button">看成績</button></p>
       <button class="primary" id="bAgain" type="button">再來一局</button>
       <button class="secondary" id="bChange" type="button">換難度或造型</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="recMenu" hidden role="dialog" aria-modal="true" aria-labelledby="recTitle">
+    <div class="card">
+      <div class="rec-head">
+        <div><p class="kicker">RECORDS · 這台裝置</p><h2 id="recTitle">成績</h2></div>
+        <button class="rec-x" id="bRecX" type="button" aria-label="關閉成績">×</button>
+      </div>
+      <p class="rec-off" id="recOff" hidden>這個瀏覽器不讓網頁存資料（可能是無痕模式或隱私設定），成績不會被記錄，但遊戲照常可以玩。</p>
+      <label class="rec-field"><span>暱稱</span>
+        <input id="recName" type="text" maxlength="12" autocomplete="nickname" enterkeyhint="done" spellcheck="false" placeholder="最多 12 個字">
+      </label>
+      <p class="rec-hint" id="recHint">之後每局的成績會用這個名字記錄，顯示在排行榜上。</p>
+      <div class="stats">
+        <div><b id="recRate">—</b><span>總勝率</span></div>
+        <div><b id="recStreak">0</b><span>目前連勝</span></div>
+        <div><b id="recBest">0</b><span>最高連勝</span></div>
+      </div>
+      <p class="rec-line" id="recTotals"></p>
+      <p class="rec-line" id="recBigWin" hidden></p>
+      <p class="label">排行榜</p>
+      <div class="rec-tabs" id="recTabs" role="group" aria-label="排行榜難度"></div>
+      <div class="rec-board" id="recBoard"></div>
+      <p class="label" id="recRecentLabel">最近比賽</p>
+      <ol class="rec-list rec-recent" id="recRecent"></ol>
+      <div class="row" id="recActions">
+        <button class="secondary" id="bRecClear" type="button">清除紀錄</button>
+        <button class="primary" id="bRecDone" type="button">關閉</button>
+      </div>
+      <div class="rec-confirm" id="recConfirm" hidden>
+        <p>確定要清除這台裝置上的所有成績嗎？清除後無法復原（暱稱會保留）。</p>
+        <div class="row">
+          <button class="secondary" id="bRecNo" type="button">取消</button>
+          <button class="rec-danger" id="bRecYes" type="button">確定清除</button>
+        </div>
+      </div>
+      <p class="rec-foot">成績只存在這台裝置的這個瀏覽器裡，最多保留最近 500 局；換手機或清除瀏覽器資料就會不見。</p>
     </div>
   </div>
 </div>
 
 <script src="engine.js"></script>
 <script src="skins.js"></script>
+<script src="records.js"></script>
 <script>
 (function () {
   'use strict';
@@ -687,7 +774,7 @@ button { font: inherit; color: inherit; }
         case 'point': onPoint(e); break;
         case 'let': banner('擦網重發', '發球擦網後落在對面，這球重發', '', 1300); break;
         case 'serveReady': onServeReady(e); break;
-        case 'gameover': onGameOver(e); break;
+        case 'gameover': onGameOver(e); saveGameRecord(); break;
       }
     }
     game.events.length = 0;
@@ -864,6 +951,158 @@ button { font: inherit; color: inherit; }
     updateTip();
     requestAnimationFrame(frame);
   }
+
+  // ---------------- records ----------------
+  // 成績與排行榜：統計和讀寫都在 records.js（不碰畫面），這裡只負責顯示。
+  // records.js 沒載入、或瀏覽器不讓存資料時，遊戲照常能玩，只是不記錄。
+  const REC = window.R11Records || null;
+  const recStore = REC ? REC.createStore(REC.storageOf(window)) : null;
+  const recCanSave = !!(recStore && recStore.usable());
+  const recDiffs = Object.keys(E.DIFFS);
+  let recTab = diffKey, recFrom = null;
+  const recDiffName = (k) => (E.DIFFS[k] ? E.DIFFS[k].name : k);
+  const recSkinName = (id) => (SK.byId[id] ? SK.byId[id].name : '—');
+  const recWho = (g) => g.name || '玩家';
+  function recEl(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  // 每局打完記一筆，結算畫面顯示有沒有破紀錄
+  function saveGameRecord() {
+    if (!recStore || game.recorded) return;
+    game.recorded = true;
+    const res = recStore.record({
+      diff: game.diff.key, skin: skinId, name: recStore.getName(),
+      p: game.score.p, r: game.score.r, secs: game.time, rally: game.longest,
+    });
+    let msg = '';
+    if (res.game && !res.saved) msg = '這個瀏覽器不能存資料，這局沒有記錄。';
+    else if (res.game) {
+      const a = REC.achievements(res.prev, res.game), d = recDiffName(res.game.diff), parts = [];
+      if (a.firstWin) parts.push(`第一次在「${d}」贏過 R-11！`);
+      else if (a.bestMargin) parts.push(`新紀錄：「${d}」最大分差 ${res.game.p}:${res.game.r}`);
+      if (a.longestRally) parts.push(`新紀錄：最長來回 ${res.game.rally} 拍`);
+      if (a.streak >= 2) parts.push(a.bestStreak ? `${a.streak} 連勝，最高紀錄！` : `目前 ${a.streak} 連勝`);
+      msg = parts.length ? parts.slice(0, 2).join('　') : '這局已記錄到成績。';
+    }
+    $('endRecText').textContent = msg;
+    $('endRec').hidden = !msg;
+  }
+
+  function renderRecords() {
+    const all = recStore.load().games, S = REC.summarize(all, recDiffs);
+    $('recOff').hidden = recCanSave;
+    $('recName').disabled = !recCanSave;
+    $('recRate').textContent = REC.formatRate(S.rate);
+    $('recStreak').textContent = S.streak.current;
+    $('recBest').textContent = S.streak.best;
+    $('recTotals').textContent = S.played ? `共 ${S.played} 局：${S.won} 勝 ${S.lost} 敗` : '還沒有紀錄，打完一局就會出現在這裡。';
+    const bw = S.bestWin, big = $('recBigWin');
+    big.hidden = !bw; big.textContent = '';
+    if (bw) big.append('最大分差勝利　', recEl('b', '', `${bw.p}:${bw.r}`), `　${recDiffName(bw.diff)} · `, recEl('span', 'rec-nm', recWho(bw)), ` · ${REC.formatDate(bw.at)}`);
+    for (const b of $('recTabs').children) b.setAttribute('aria-pressed', b.dataset.diff === recTab ? 'true' : 'false');
+    renderBoard(S.byDiff[recTab]);
+    const ol = $('recRecent'); ol.textContent = '';
+    for (const g of S.recent) {
+      const li = recEl('li');
+      li.append(
+        recEl('span', 'rec-res ' + (g.win ? 'win' : 'lose'), g.win ? '勝' : '敗'),
+        recEl('span', 'rec-sc', `${g.p}:${g.r}`),
+        recEl('span', 'rec-meta', `${recDiffName(g.diff)} · ${recSkinName(g.skin)}`),
+        recEl('span', 'rec-dt', REC.formatShort(g.at)),
+      );
+      const sub = recEl('span', 'rec-sub');
+      sub.append(`比賽 ${REC.formatDuration(g.secs)} · 最長來回 ${g.rally == null ? '—' : g.rally + ' 拍'} · `, recEl('span', 'rec-nm', recWho(g)));
+      li.append(sub); ol.append(li);
+    }
+    $('recRecentLabel').hidden = ol.hidden = !S.recent.length;
+    $('bRecClear').disabled = !all.length;
+  }
+  function renderBoard(T) {
+    const box = $('recBoard'), d = recDiffName(recTab);
+    box.textContent = '';
+    if (!T || !T.played) { box.append(recEl('p', 'rec-line', `還沒有「${d}」的紀錄。`)); return; }
+    const line = recEl('p', 'rec-line');
+    line.append(`「${d}」勝率 `, recEl('b', '', REC.formatRate(T.rate)), `（${T.won} 勝 ${T.lost} 敗）`);
+    box.append(line);
+    if (T.top.length) {
+      box.append(recEl('p', 'rec-cap', '贏最多分差'));
+      const ol = recEl('ol', 'rec-list');
+      T.top.forEach((g, i) => {
+        const li = recEl('li');
+        li.append(recEl('span', 'rec-rk', i + 1), recEl('span', 'rec-nm', recWho(g)), recEl('span', 'rec-sc', `${g.p}:${g.r}`), recEl('span', 'rec-dt', REC.formatDate(g.at)));
+        ol.append(li);
+      });
+      box.append(ol);
+    } else box.append(recEl('p', 'rec-line', '還沒有勝利紀錄，加油！'));
+    const dl = recEl('dl', 'rec-best');
+    const row = (label, g, value) => {
+      const div = recEl('div'), dd = recEl('dd');
+      if (g) dd.append(value + ' · ', recEl('span', 'rec-nm', recWho(g)), ' · ' + REC.formatDate(g.at)); else dd.textContent = '—';
+      div.append(recEl('dt', '', label), dd); dl.append(div);
+    };
+    row('最長來回', T.longestRally, T.longestRally && `${T.longestRally.rally} 拍`);
+    row('最快勝利', T.fastestWin, T.fastestWin && REC.formatDuration(T.fastestWin.secs));
+    box.append(dl);
+  }
+
+  function showRecConfirm(on) {
+    $('recConfirm').hidden = !on; $('recActions').hidden = on;
+    (on ? $('bRecNo') : $('bRecClear')).focus();
+  }
+  function saveRecName() {
+    const v = recStore.setName($('recName').value);
+    if ($('recName').value !== v) $('recName').value = v;
+  }
+  function openRecords(from) {
+    if (!recStore) return;
+    recFrom = from || null;
+    recTab = diffKey;
+    $('recName').value = recStore.getName();
+    $('recConfirm').hidden = true; $('recActions').hidden = false;
+    renderRecords();
+    $('recMenu').hidden = false; $('recMenu').scrollTop = 0;
+    $('bRecX').focus();
+  }
+  function closeRecords() {
+    if ($('recMenu').hidden) return;
+    if (recCanSave) saveRecName();
+    $('recMenu').hidden = true;
+    if (recFrom) recFrom.focus();
+  }
+
+  if (recStore) {
+    for (const k of recDiffs) {
+      const b = recEl('button', '', recDiffName(k));
+      b.type = 'button'; b.dataset.diff = k;
+      b.addEventListener('click', () => { recTab = k; renderRecords(); });
+      $('recTabs').append(b);
+    }
+    $('bRecords').addEventListener('click', () => openRecords($('bRecords')));
+    $('bEndRec').addEventListener('click', () => openRecords($('bEndRec')));
+    $('bRecX').addEventListener('click', closeRecords);
+    $('bRecDone').addEventListener('click', closeRecords);
+    $('recName').addEventListener('change', saveRecName);
+    $('recName').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) $('recName').blur(); });
+    $('bRecClear').addEventListener('click', () => showRecConfirm(true));
+    $('bRecNo').addEventListener('click', () => showRecConfirm(false));
+    $('bRecYes').addEventListener('click', () => {
+      recStore.clear(); $('endRec').hidden = true;
+      $('recConfirm').hidden = true; $('recActions').hidden = false;
+      renderRecords(); $('bRecDone').focus();
+    });
+    // 面板裡的按鍵不要傳到遊戲（打暱稱時 WASD、空白鍵不能動到球拍或發球）
+    $('recMenu').addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key !== 'Escape' || e.isComposing) return;
+      e.preventDefault();
+      if (!$('recConfirm').hidden) showRecConfirm(false); else closeRecords();
+    });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRecords(); });
+  } else $('bRecords').hidden = true;
 
   // ---------------- boot ----------------
   function boot(data) {
