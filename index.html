@@ -105,6 +105,7 @@ button { font: inherit; color: inherit; }
 .row > * { flex: 1 1 130px; }
 .sound { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); cursor: pointer; justify-self: start; }
 .sound input { width: 17px; height: 17px; accent-color: var(--accent); }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .result { display: grid; justify-items: center; gap: 6px; text-align: center; }
 .result-score { font-family: var(--f-num); font-weight: 800; font-size: 60px; line-height: 1; display: flex; gap: 16px; align-items: baseline; font-variant-numeric: tabular-nums; }
 .result-score small { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0.1em; display: block; text-align: center; }
@@ -164,7 +165,10 @@ button { font: inherit; color: inherit; }
       <div class="skins" id="skinsMenu" role="group" aria-label="機器人造型"></div>
       <p class="skin-desc" id="skinDescMenu"></p>
       <button class="primary" id="bStart" type="button">開始比賽</button>
+      <div class="toggles">
       <label class="sound"><input type="checkbox" id="snd1" checked> 音效</label>
+      <label class="sound"><input type="checkbox" id="vib1"> 震動</label>
+      </div>
       <div class="howto-wrap">
       <p class="label">怎麼玩</p>
       <dl class="howto">
@@ -191,7 +195,10 @@ button { font: inherit; color: inherit; }
         <button class="secondary" id="bRestart" type="button">重新開始</button>
         <button class="secondary" id="bMenu" type="button">回選單</button>
       </div>
+      <div class="toggles">
       <label class="sound"><input type="checkbox" id="snd2" checked> 音效</label>
+      <label class="sound"><input type="checkbox" id="vib2"> 震動</label>
+      </div>
     </div>
   </div>
 
@@ -235,6 +242,9 @@ button { font: inherit; color: inherit; }
     if (localStorage.getItem('r11-sound') === '0') soundOn = false;
     const k = localStorage.getItem('r11-skin'); if (k && SK.byId[k]) skinId = k;
   } catch (e) { /* storage unavailable */ }
+  // vibration starts off for reduced-motion users; a saved choice wins either way
+  let vibeOn = !reduced;
+  try { const v = localStorage.getItem('r11-vibe'); if (v === '1' || v === '0') vibeOn = v === '1'; } catch (e) { /* storage unavailable */ }
   const currentSkin = () => SK.byId[skinId] || SK.list[0];
   let game = E.createGame(diffKey), running = false, paused = false, pointsPlayed = 0, lastPointer = coarse ? 'touch' : 'mouse';
   const input = { tx: 0, tz: PAD.restZ };
@@ -548,7 +558,14 @@ button { font: inherit; color: inherit; }
       if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       try {
-        ac = new AC(); out = ac.createGain(); out.gain.value = 0.55; out.connect(ac.destination);
+        ac = new AC(); out = ac.createGain(); out.gain.value = 0.55;
+        // a soft limiter so stacked layers (smash + bounce + jingle) stay smooth instead of clipping;
+        // note the compressor adds ~6 dB of automatic make-up gain, which the per-sound levels below already account for
+        if (ac.createDynamicsCompressor) {
+          const comp = ac.createDynamicsCompressor();
+          comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.002; comp.release.value = 0.18;
+          out.connect(comp); comp.connect(ac.destination);
+        } else out.connect(ac.destination);
         noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.3), ac.sampleRate);
         const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       } catch (e) { ac = null; }
@@ -559,36 +576,93 @@ button { font: inherit; color: inherit; }
       const t = ac.currentTime + (o.delay || 0), osc = ac.createOscillator(), g = ac.createGain();
       osc.type = o.type || 'sine'; osc.frequency.setValueAtTime(freq, t);
       if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + dur);
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.gain || 0.3, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.gain || 0.3, t + (o.attack || 0.004)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       osc.connect(g); g.connect(dest(o.pan)); osc.start(t); osc.stop(t + dur + 0.03);
     }
     function noise(dur, o) {
       if (!ac || !soundOn) return; o = o || {};
       const t = ac.currentTime + (o.delay || 0), src = ac.createBufferSource(), fl = ac.createBiquadFilter(), g = ac.createGain();
-      src.buffer = noiseBuf; fl.type = o.filter || 'bandpass'; fl.frequency.value = o.freq || 3000; fl.Q.value = o.q || 1.2;
+      src.buffer = noiseBuf; fl.type = o.filter || 'bandpass'; fl.frequency.setValueAtTime(o.freq || 3000, t); fl.Q.value = o.q || 1.2;
+      if (o.to) fl.frequency.exponentialRampToValueAtTime(o.to, t + dur);
       g.gain.setValueAtTime(o.gain || 0.2, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       src.connect(fl); fl.connect(g); g.connect(dest(o.pan)); src.start(t); src.stop(t + dur + 0.03);
     }
+    // short plucked notes for jingles; `at` offsets each note, chords share one start time
+    function notes(list, o) { for (const [n, at, dur] of list) tone(n, dur || 0.2, { type: 'triangle', gain: o.gain, attack: o.attack, delay: (o.delay || 0) + at }); }
     return {
       init,
-      hit(type, pan) {
-        const big = type === 'smash';
-        tone(big ? 900 : 1180, 0.07, { to: big ? 520 : 780, gain: big ? 0.42 : 0.3, pan });
-        noise(0.03, { freq: 3300, gain: big ? 0.38 : 0.22, pan });
-        if (big) tone(220, 0.13, { to: 110, gain: 0.26, pan });
+      // paddle: a wooden "tock" whose pitch, brightness and loudness follow the shot's power;
+      // R-11's shots sound a little lower and quieter because they come from the far end
+      hit(type, pan, speed, who) {
+        const v = who === 'r' ? 0.78 : 1, pt = who === 'r' ? 0.92 : 1;
+        if (type === 'smash') {
+          noise(0.05, { freq: 2600, q: 0.8, gain: 0.24 * v, pan });
+          tone(880 * pt, 0.08, { to: 470, gain: 0.22 * v, pan });
+          tone(190, 0.14, { to: 85, gain: 0.18 * v, pan });
+          noise(0.16, { filter: 'highpass', freq: 3200, to: 1400, gain: 0.05 * v, pan, delay: 0.015 });
+          return;
+        }
+        if (type === 'drop') {
+          tone(820 * pt, 0.045, { to: 610, gain: 0.13 * v, pan });
+          noise(0.018, { filter: 'lowpass', freq: 1900, gain: 0.07 * v, pan });
+          return;
+        }
+        // drive / serve / R-11's mishit: power 0 (soft push) .. 1 (fast drive); a mishit sounds duller
+        const k = type === 'serve' ? 0.2 : clamp(((speed || 5) - 3.5) / 5.5, 0, type === 'error' ? 0.5 : 1);
+        const dull = type === 'error' ? 0.85 : 1;
+        tone((1000 + 320 * k) * pt * dull, 0.05 + 0.02 * k, { to: (720 + 160 * k) * pt * dull, gain: (0.17 + 0.13 * k) * v, pan });
+        noise(0.022 + 0.01 * k, { freq: (2500 + 1200 * k) * dull, gain: (0.1 + 0.13 * k) * v, pan });
       },
-      bounce(pan, sp) { tone(1950, 0.05, { to: 1480, gain: 0.1 + Math.min(0.14, (sp || 3) * 0.018), pan }); },
-      floor() { tone(720, 0.06, { to: 500, gain: 0.07 }); },
-      net() { noise(0.1, { filter: 'lowpass', freq: 700, gain: 0.28 }); },
+      // table: a bright click plus the board's hollow body, louder for faster balls and softer at the far end
+      bounce(pan, sp, z) {
+        const k = clamp((sp || 4) / 9, 0, 1), d = z < 0 ? 0.75 : 1;
+        tone(1700 + 300 * k, 0.045, { to: 1300, gain: (0.055 + 0.07 * k) * d, pan });
+        tone(430, 0.06, { to: 300, gain: (0.025 + 0.03 * k) * d, pan });
+        noise(0.012, { freq: 4200, gain: (0.02 + 0.03 * k) * d, pan });
+      },
+      floor(sp) {
+        const k = clamp((sp || 1) / 3, 0, 1);
+        tone(620, 0.07, { to: 430, gain: 0.02 + 0.025 * k }); tone(250, 0.08, { to: 170, gain: 0.02 + 0.015 * k });
+      },
+      // ball into the net: a muffled thump and rustle
+      net() { noise(0.14, { filter: 'lowpass', freq: 900, to: 300, gain: 0.15 }); tone(150, 0.12, { to: 80, gain: 0.08 }); },
+      // ball clipping the top of the net: a sharp tick and a quick buzz of the tape
+      netcord() {
+        tone(2300, 0.03, { to: 1700, gain: 0.1 });
+        noise(0.09, { freq: 1500, q: 2.5, gain: 0.13 });
+        tone(330, 0.12, { type: 'triangle', to: 300, gain: 0.05 });
+      },
       toss() { tone(520, 0.06, { to: 720, gain: 0.05 }); },
-      point(win) {
-        if (win) { tone(660, 0.1, { type: 'triangle', gain: 0.17 }); tone(990, 0.17, { type: 'triangle', gain: 0.17, delay: 0.09 }); }
-        else { tone(520, 0.12, { type: 'triangle', gain: 0.14 }); tone(390, 0.2, { type: 'triangle', gain: 0.14, delay: 0.1 }); }
+      out() { tone(300, 0.28, { type: 'triangle', to: 180, gain: 0.1, attack: 0.01 }); },
+      point(win, delay) {
+        const d = delay || 0;
+        if (win) { notes([[784, 0, 0.12], [1175, 0.09, 0.2]], { gain: 0.11, delay: d }); tone(2349, 0.16, { gain: 0.02, delay: d + 0.09 }); }
+        else notes([[466, 0, 0.14], [349, 0.11, 0.24]], { gain: 0.1, delay: d });
       },
-      end(win) { (win ? [523, 659, 784, 1046] : [440, 415, 392, 330]).forEach((n, i) => tone(n, 0.24, { type: 'triangle', gain: 0.17, delay: i * 0.13 })); },
+      deuce() { notes([[659, 0, 0.12], [880, 0.12, 0.12], [659, 0.24, 0.12], [880, 0.36, 0.22]], { gain: 0.1 }); },
+      end(win) {
+        if (win) {
+          notes([[523, 0, 0.16], [659, 0.12, 0.16], [784, 0.24, 0.16]], { gain: 0.11 });
+          notes([[523, 0.4, 0.8], [659, 0.4, 0.8], [784, 0.4, 0.8], [1046, 0.4, 0.8]], { gain: 0.05, attack: 0.012 });
+          tone(2093, 0.3, { gain: 0.018, delay: 0.4 });
+        } else {
+          notes([[440, 0, 0.24], [392, 0.2, 0.24], [349, 0.4, 0.26]], { gain: 0.1 });
+          notes([[294, 0.62, 0.8], [349, 0.62, 0.8]], { gain: 0.055, attack: 0.015 });
+        }
+      },
+      click() { tone(1320, 0.03, { to: 990, gain: 0.07 }); },
     };
   })();
   const pan = (x) => clamp(x / 1.1, -1, 1) * 0.8;
+
+  // ---------------- vibration ----------------
+  // iPhone Safari has no navigator.vibrate: the toggle stays hidden there and every call is skipped
+  const canVibrate = typeof navigator.vibrate === 'function';
+  const BUZZ = { serve: 10, drive: 14, drop: 9, smash: 40, point: [18, 60, 18], lose: 70, win: [40, 70, 40, 70, 40, 110, 160] };
+  function buzz(p) {
+    if (!vibeOn || !canVibrate || p == null) return;
+    try { navigator.vibrate(p); } catch (e) { /* ignore */ }
+  }
 
   // ---------------- HUD ----------------
   let bannerTimer = 0, calloutTimer = 0, queued = null;
@@ -635,7 +709,9 @@ button { font: inherit; color: inherit; }
   function onPoint(e) {
     pointsPlayed++;
     flipScore(e.winner, game.score[e.winner]);
-    Sound.point(e.winner === 'p');
+    if (e.reason === 'out') Sound.out();
+    Sound.point(e.winner === 'p', e.reason === 'out' ? 0.2 : 0);
+    buzz(e.winner === 'p' ? BUZZ.point : BUZZ.lose);
     if (e.winner === 'p') {
       const main = e.hitter === 'p' && e.shot === 'smash' && (e.reason === 'miss' || e.reason === 'double') ? '扣殺得分！'
         : e.hitter === 'p' && e.shot === 'drop' && (e.reason === 'miss' || e.reason === 'double') ? '放短得分！' : '得分！';
@@ -650,6 +726,7 @@ button { font: inherit; color: inherit; }
     trail.length = 0;
     const st = e.deuce ? 'Deuce 平分' : e.gamePoint === 'p' ? '你的賽末點' : e.gamePoint === 'r' ? 'R-11 賽末點' : '';
     $('status').textContent = st;
+    if (e.deuce && !e.initial) Sound.deuce();
     if (!e.initial && st) queued = [st, e.deuce ? '要連拿 2 分才能贏' : e.gamePoint === 'p' ? '再拿 1 分就贏了' : '守住這一分', 'neutral', 1200];
     // the point banner (1.4 s) usually hides before serveReady (dead time 1.55 s), so show it now instead of waiting
     if (queued && $('banner').hidden) { const q = queued; queued = null; banner(q[0], q[1], q[2], q[3]); }
@@ -657,6 +734,7 @@ button { font: inherit; color: inherit; }
   function onGameOver(e) {
     const win = e.winner === 'p';
     Sound.end(win);
+    if (win) buzz(BUZZ.win);
     setTimeout(() => {
       $('endKicker').textContent = `${game.diff.name} · GAME`;
       $('endTitle').textContent = win ? '你贏了！' : 'R-11 獲勝';
@@ -674,17 +752,18 @@ button { font: inherit; color: inherit; }
       switch (e.kind) {
         case 'hit': {
           const b = game.ball;
-          Sound.hit(e.type, pan(e.x));
+          Sound.hit(e.type, pan(e.x), e.speed, e.who);
+          if (e.who === 'p') buzz(BUZZ[e.type]);
           sparks(b.x, b.y, b.z, e.who === 'p' ? '#ffb627' : '#3ee6cf', e.type === 'smash' ? 14 : 6, e.type === 'smash' ? 1.5 : 1);
           if (e.who === 'p' && e.type === 'smash') { callout('扣殺！', 'good'); shake = 1; }
           else if (e.who === 'p' && e.type === 'drop') callout('放短', 'good');
           else if (e.who === 'r' && e.type === 'smash') { callout('R-11 扣殺！', 'bad'); shake = 0.6; }
           break;
         }
-        case 'bounce': Sound.bounce(pan(e.x), e.speed); fx.push({ kind: 'ring', x: e.x, z: e.z, t: 0 }); break;
+        case 'bounce': Sound.bounce(pan(e.x), e.speed, e.z); fx.push({ kind: 'ring', x: e.x, z: e.z, t: 0 }); break;
         case 'net': Sound.net(); netFlash = 1; break;
-        case 'netcord': Sound.net(); netFlash = 1; if (e.live) callout('擦網！'); break;
-        case 'floor': Sound.floor(); break;
+        case 'netcord': Sound.netcord(); netFlash = 1; if (e.live) callout('擦網！'); break;
+        case 'floor': Sound.floor(e.speed); break;
         case 'toss': Sound.toss(); break;
         case 'point': onPoint(e); break;
         case 'let': banner('擦網重發', '發球擦網後落在對面，這球重發', '', 1300); break;
@@ -757,6 +836,10 @@ button { font: inherit; color: inherit; }
   function setSound(on) {
     soundOn = on; $('snd1').checked = on; $('snd2').checked = on;
     try { localStorage.setItem('r11-sound', on ? '1' : '0'); } catch (e) { /* ignore */ }
+  }
+  function setVibe(on, save) {
+    vibeOn = on; $('vib1').checked = on; $('vib2').checked = on;
+    if (save) { try { localStorage.setItem('r11-vibe', on ? '1' : '0'); } catch (e) { /* ignore */ } }
   }
   // ---------------- skin pickers ----------------
   const pickers = [];
@@ -843,6 +926,11 @@ button { font: inherit; color: inherit; }
   $('bChange').addEventListener('click', toMenu);
   $('snd1').addEventListener('change', (e) => setSound(e.target.checked));
   $('snd2').addEventListener('change', (e) => setSound(e.target.checked));
+  // turning sound back on answers with a tick; turning vibration on answers with a short buzz
+  for (const id of ['snd1', 'snd2']) $(id).addEventListener('change', (e) => { if (e.target.checked) { Sound.init(); Sound.click(); } });
+  for (const id of ['vib1', 'vib2']) $(id).addEventListener('change', (e) => { setVibe(e.target.checked, true); buzz(BUZZ.drive); });
+  // every button ticks softly, except 發球 (the toss sound already answers it)
+  gameEl.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && b.id !== 'bServe') { Sound.init(); Sound.click(); } });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
   // ---------------- loop ----------------
@@ -875,6 +963,8 @@ button { font: inherit; color: inherit; }
     if (data.skinId && SK.byId[data.skinId]) skinId = data.skinId;
     buildPicker('skinsMenu', 'skinDescMenu'); buildPicker('skinsPause', 'skinDescPause');
     setDiff(diffKey); setSound(soundOn); setSkin(skinId, false);
+    setVibe(vibeOn, false);
+    if (!canVibrate) for (const id of ['vib1', 'vib2']) $(id).closest('label').hidden = true;
     new ResizeObserver(resize).observe(gameEl);
     resize();
     if (data.score && data.running) {
