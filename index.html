@@ -179,7 +179,7 @@ button { font: inherit; color: inherit; }
     <div class="card">
       <p class="kicker">TABLE TENNIS · 11 POINTS</p>
       <h1 class="cpu-only">對手：機器人 <span class="num">R-11</span></h1>
-      <h1 class="pvp-only">雙人對戰：玩家 <span class="num">1</span> 對 玩家 <span class="num">2</span></h1>
+      <h1 class="pvp-only">雙人對戰</h1>
       <p class="lede cpu-only">一局 11 分。移動球拍接球，擊球那一下怎麼動，球就怎麼飛。</p>
       <p class="lede pvp-only">一局 11 分。兩個人在同一支手機或同一台電腦上對打，各自控制一支球拍。</p>
       <p class="label">模式</p>
@@ -553,6 +553,7 @@ button { font: inherit; color: inherit; }
   function drawShadow() {
     const b = game.ball;
     const onTable = Math.abs(b.x) <= HX && Math.abs(b.z) <= HZ && b.y >= -0.005;
+    if (isPvp() && !onTable) return; // from above, a floor shadow would look like it sits on the table end
     const sy = onTable ? 0.002 : FLOOR + 0.002, h = Math.max(0, b.y - sy);
     // seen from above the shadow is the height cue: light from the -x side pushes it out as the ball rises
     groundEllipse(ctx, b.x + (isPvp() ? h * 0.3 : 0), sy, b.z, 0.026 * (1 + h * 0.9));
