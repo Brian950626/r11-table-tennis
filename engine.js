@@ -5,14 +5,24 @@
   const G = 9.81, R = 0.02;
   const HX = 0.7625, HZ = 1.37, NET_H = 0.1525, NET_X = HX + 0.1525, FLOOR = -0.76;
   const SPIN = { none: { e: 0.89, kh: 0.97 }, top: { e: 0.8, kh: 1.04 }, back: { e: 0.7, kh: 0.5 } };
+  // 旋轉的強度：spinTop +1 是最強上旋、-1 是最強下旋；spinSide +1 往 +x 彎、-1 往 -x 彎。
+  // 落台的反彈係數在 SPIN.none 和 SPIN.top／SPIN.back 之間依強度內插。
+  const SPINFX = {
+    magTop: 3.2, magBack: 2.4, magSide: 2.6, // 飛行中的額外加速度（m/s²）：上旋往下壓、下旋往上托、側旋往旁邊彎
+    kickSide: 0.55, // 側旋落台後往旁邊多拐的速度（m/s）
+    keepTop: 0.5, keepSide: 0.7, // 落台後剩下的旋轉比例
+    recvY: 0.6, recvX: 0.45, recvSig: 0.03, // 接球時沒化解掉的來球旋轉讓回球偏掉多少
+    smashTop: 1, // 扣殺帶的上旋
+  };
   const SUB = 1 / 500;
   const PAD = { xMin: -1.05, xMax: 1.05, zMin: 0.9, zMax: 2.05, restZ: 1.62 };
   const ROB = { zRest: -1.62, zDeep: -1.85, xMax: 1.0 };
 
+  // spin：R-11 一般回球帶旋轉的機率；spinMax：它打出的最強旋轉；rSpinErr：接到旋轉球時多出的失誤率
   const DIFFS = {
-    easy: { key: 'easy', name: '簡單', ts: 0.47, pReach: 0.2, rReach: 0.15, rSpeed: 1.45, rZ: 0.8, rReact: 0.24, rNoise: 0.07, rErr: 0.12, rErrK: 0.26, rTf: [0.56, 0.64], spread: 0.3, corner: 0, smash: 0.03, drop: 0, rZmin: -1.0, hint: true },
-    normal: { key: 'normal', name: '普通', ts: 0.55, pReach: 0.17, rReach: 0.16, rSpeed: 2.0, rZ: 0.75, rReact: 0.16, rNoise: 0.035, rErr: 0.06, rErrK: 0.2, rTf: [0.46, 0.54], spread: 0.45, corner: 0.4, smash: 0.25, drop: 0.06, rZmin: -0.95, hint: false },
-    hard: { key: 'hard', name: '困難', ts: 0.63, pReach: 0.155, rReach: 0.17, rSpeed: 2.7, rZ: 0.7, rReact: 0.1, rNoise: 0.015, rErr: 0.03, rErrK: 0.14, rTf: [0.38, 0.46], spread: 0.6, corner: 0.8, smash: 0.55, drop: 0.12, rZmin: -0.9, hint: false },
+    easy: { key: 'easy', name: '簡單', ts: 0.47, pReach: 0.2, rReach: 0.15, rSpeed: 1.45, rZ: 0.8, rReact: 0.24, rNoise: 0.07, rErr: 0.12, rErrK: 0.26, rTf: [0.56, 0.64], spread: 0.3, corner: 0, smash: 0.03, drop: 0, rZmin: -1.0, spin: 0.08, spinMax: 0.5, rSpinErr: 0.3, hint: true },
+    normal: { key: 'normal', name: '普通', ts: 0.55, pReach: 0.17, rReach: 0.16, rSpeed: 2.0, rZ: 0.75, rReact: 0.16, rNoise: 0.035, rErr: 0.06, rErrK: 0.2, rTf: [0.46, 0.54], spread: 0.45, corner: 0.4, smash: 0.25, drop: 0.06, rZmin: -0.95, spin: 0.3, spinMax: 0.75, rSpinErr: 0.2, hint: false },
+    hard: { key: 'hard', name: '困難', ts: 0.63, pReach: 0.155, rReach: 0.17, rSpeed: 2.7, rZ: 0.7, rReact: 0.1, rNoise: 0.015, rErr: 0.03, rErrK: 0.14, rTf: [0.38, 0.46], spread: 0.6, corner: 0.8, smash: 0.55, drop: 0.12, rZmin: -0.9, spin: 0.55, spinMax: 1.0, rSpinErr: 0.12, hint: false },
   };
 
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -20,38 +30,65 @@
   const rand = (a, b) => a + (b - a) * rng();
   function gauss() { let u = 0; while (!u) u = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng()); }
 
-  // ---------- ball physics: exact constant-gravity kinematics, event-driven collisions ----------
+  // ---------- spin ----------
+  // 'none'／'top'／'back' 這些舊的旋轉名稱換成強度
+  function toSpin(s) {
+    if (s && typeof s === 'object') return { top: s.top || 0, side: s.side || 0 };
+    return { top: s === 'top' ? 1 : s === 'back' ? -1 : 0, side: 0 };
+  }
+  function spinLabel(top, side) {
+    if (Math.abs(side) >= 0.3 && Math.abs(side) >= Math.abs(top)) return 'side';
+    return top >= 0.2 ? 'top' : top <= -0.2 ? 'back' : 'none';
+  }
+  function setSpin(b, top, side) {
+    b.spinTop = clamp(top, -1, 1); b.spinSide = clamp(side, -1, 1); b.spin = spinLabel(b.spinTop, b.spinSide);
+  }
+  // 旋轉造成的加速度：gy 是往下的總加速度（上旋比重力大、下旋比重力小），ax 是側旋的橫向加速度
+  function spinAccel(top, side) {
+    return { gy: G + (top >= 0 ? SPINFX.magTop : SPINFX.magBack) * top, ax: SPINFX.magSide * side };
+  }
+  // 接球時，來球旋轉沒被自己的旋轉抵消的部分會讓回球偏掉：下旋往下（掛網）、上旋往上（出界）、側旋往旁邊
+  function receiveKick(inc, own) {
+    const t = inc.top < 0 ? Math.min(0, inc.top + Math.max(0, own.top)) : Math.max(0, inc.top + Math.min(0, own.top));
+    const s = inc.side < 0 ? Math.min(0, inc.side + Math.max(0, own.side)) : Math.max(0, inc.side + Math.min(0, own.side));
+    return { vx: SPINFX.recvX * s, vy: SPINFX.recvY * t };
+  }
+
+  // ---------- ball physics: exact constant-acceleration kinematics, event-driven collisions ----------
   function stepBall(b, dt, ev) {
+    if (typeof b.spinTop !== 'number' || typeof b.spinSide !== 'number') { const w = toSpin(b.spin); setSpin(b, w.top, w.side); }
     let rem = dt;
     for (let guard = 0; rem > 1e-10 && guard < 6; guard++) {
-      const h = rem;
+      const h = rem, A = spinAccel(b.spinTop, b.spinSide), gy = A.gy, ax = A.ax;
       let tNet = Infinity, tTab = Infinity, tFlo = Infinity;
       const nz = b.z + b.vz * h;
       if (b.z !== 0 && (b.z > 0) !== (nz > 0)) {
         const tc = (b.z / (b.z - nz)) * h;
-        const yc = b.y + b.vy * tc - 0.5 * G * tc * tc, xc = b.x + b.vx * tc;
+        const yc = b.y + b.vy * tc - 0.5 * gy * tc * tc, xc = b.x + b.vx * tc + 0.5 * ax * tc * tc;
         if (Math.abs(xc) <= NET_X && yc < NET_H + R && yc > 0) tNet = tc;
       }
-      const ny = b.y + b.vy * h - 0.5 * G * h * h;
+      const ny = b.y + b.vy * h - 0.5 * gy * h * h;
       if (b.y >= R - 1e-9 && ny < R) {
-        const t = (b.vy + Math.sqrt(Math.max(0, b.vy * b.vy + 2 * G * (b.y - R)))) / G;
+        const t = (b.vy + Math.sqrt(Math.max(0, b.vy * b.vy + 2 * gy * (b.y - R)))) / gy;
         if (t <= h) {
-          const xi = b.x + b.vx * t, zi = b.z + b.vz * t;
+          const xi = b.x + b.vx * t + 0.5 * ax * t * t, zi = b.z + b.vz * t;
           if (Math.abs(xi) <= HX && Math.abs(zi) <= HZ) tTab = t;
         }
       }
       const fy = FLOOR + R;
       if (b.y >= fy && ny < fy) {
-        const t = (b.vy + Math.sqrt(Math.max(0, b.vy * b.vy + 2 * G * (b.y - fy)))) / G;
+        const t = (b.vy + Math.sqrt(Math.max(0, b.vy * b.vy + 2 * gy * (b.y - fy)))) / gy;
         if (t <= h) tFlo = t;
       }
       const tE = Math.min(tNet, tTab, tFlo);
       const ta = tE === Infinity ? h : Math.max(0, tE);
-      b.x += b.vx * ta; b.z += b.vz * ta; b.y += b.vy * ta - 0.5 * G * ta * ta; b.vy -= G * ta;
+      b.x += b.vx * ta + 0.5 * ax * ta * ta; b.vx += ax * ta;
+      b.z += b.vz * ta; b.y += b.vy * ta - 0.5 * gy * ta * ta; b.vy -= gy * ta;
       rem -= ta;
       if (tE === Infinity) break;
       if (tE === tNet) {
         const s = b.vz < 0 ? 1 : -1; // side the ball came from
+        setSpin(b, b.spinTop * 0.3, b.spinSide * 0.3);
         if (b.y < NET_H + R * 0.25) {
           b.z = s * (R + 0.003); b.vz = -b.vz * 0.12; b.vx *= 0.3; b.vy = Math.min(b.vy, 0) * 0.3 - 0.2;
           ev.push({ type: 'net' });
@@ -60,10 +97,13 @@
           ev.push({ type: 'netcord' });
         }
       } else if (tE === tTab) {
-        const sp = SPIN[b.spin] || SPIN.none;
-        b.y = R; b.vy = -b.vy * sp.e; b.vx *= sp.kh; b.vz *= sp.kh; b.spin = 'none';
+        const t = b.spinTop, s = b.spinSide, P = t >= 0 ? SPIN.top : SPIN.back, k = Math.abs(t);
+        const e = SPIN.none.e + (P.e - SPIN.none.e) * k, kh = SPIN.none.kh + (P.kh - SPIN.none.kh) * k;
+        b.y = R; b.vy = -b.vy * e; b.vx = b.vx * kh + SPINFX.kickSide * s; b.vz *= kh;
+        setSpin(b, t * SPINFX.keepTop, s * SPINFX.keepSide);
         ev.push({ type: 'bounce', side: b.z > 0 ? 'p' : 'r', x: b.x, z: b.z, speed: Math.hypot(b.vx, b.vz) });
       } else {
+        setSpin(b, 0, 0);
         b.y = fy; b.vy = -b.vy * 0.55; b.vx *= 0.7; b.vz *= 0.7;
         if (Math.abs(b.vy) < 0.25) { b.vy = 0; b.vx *= 0.9; b.vz *= 0.9; }
         ev.push({ type: 'floor', speed: Math.abs(b.vy) });
@@ -72,15 +112,16 @@
     if (Math.abs(b.z) > 4.5 || Math.abs(b.x) > 3.5) { b.vx = b.vz = 0; ev.push({ type: 'far' }); }
   }
 
-  // velocity that lands the ball on (xt, R, zt) after Tf seconds
-  function aimVelocity(b, xt, zt, Tf) {
-    return { vx: (xt - b.x) / Tf, vy: (R - b.y + 0.5 * G * Tf * Tf) / Tf, vz: (zt - b.z) / Tf };
+  // velocity that lands the ball on (xt, R, zt) after Tf seconds; w = { top, side } is the spin it will carry (optional)
+  function aimVelocity(b, xt, zt, Tf, w) {
+    const A = spinAccel(w ? w.top || 0 : 0, w ? w.side || 0 : 0);
+    return { vx: (xt - b.x - 0.5 * A.ax * Tf * Tf) / Tf, vy: (R - b.y + 0.5 * A.gy * Tf * Tf) / Tf, vz: (zt - b.z) / Tf };
   }
   // height margin over the net tape (m); positive = clears
-  function netMargin(b, v) {
+  function netMargin(b, v, w) {
     if (v.vz === 0 || (b.z > 0) === (v.vz > 0)) return 1;
-    const tn = -b.z / v.vz;
-    return b.y + v.vy * tn - 0.5 * G * tn * tn - (NET_H + R);
+    const tn = -b.z / v.vz, gy = spinAccel(w ? w.top || 0 : 0, 0).gy;
+    return b.y + v.vy * tn - 0.5 * gy * tn * tn - (NET_H + R);
   }
 
   // legal serve: first bounce on the server's half (B1), then on the receiver's half at (x2, z2)
@@ -113,7 +154,7 @@
       score: { p: 0, r: 0 }, first: opts.first || 'p', server: 'p',
       phase: 'serveWait', timer: 0, hitter: 'p',
       serveOwn: false, recvBounced: false, netTouched: false, netHit: false,
-      ball: { x: 0, y: 0.12, z: PAD.restZ, vx: 0, vy: 0, vz: 0, spin: 'none' },
+      ball: { x: 0, y: 0.12, z: PAD.restZ, vx: 0, vy: 0, vz: 0, spin: 'none', spinTop: 0, spinSide: 0 },
       pad: { x: 0, y: 0.2, z: PAD.restZ, vx: 0, vz: 0, tx: 0, tz: PAD.restZ, lock: false, swing: 0 },
       robot: { x: 0, y: 0.2, z: ROB.zRest, plan: null, react: 0, noise: 0, lock: false, swing: 0, mood: 'idle', moodT: 0, tossHand: 0 },
       rallyHits: 0, longest: 0, smashWins: 0, totalHits: { p: 0, r: 0 },
@@ -132,7 +173,7 @@
     g.phase = 'serveWait'; g.timer = g.server === 'r' ? 1.1 : 0;
     g.hitter = g.server; g.serveOwn = false; g.recvBounced = false; g.netTouched = false; g.netHit = false;
     g.rallyHits = 0; g.pad.lock = false; g.robot.lock = false; g.robot.plan = null; g.hint = null; g.serveData = null;
-    const b = g.ball; b.vx = b.vy = b.vz = 0; b.spin = 'none';
+    const b = g.ball; b.vx = b.vy = b.vz = 0; setSpin(b, 0, 0);
     holdBall(g);
     const gp = sp >= 10 && sp > sr ? 'p' : sr >= 10 && sr > sp ? 'r' : null;
     g.events.push({ kind: 'serveReady', server: g.server, deuce: sp >= 10 && sp === sr, gamePoint: gp, initial: !!initial });
@@ -168,7 +209,7 @@
     let plan = servePlan(b.x, b.z, x2, z2, rng() < 0.035 ? -0.007 : undefined);
     if (!plan) plan = servePlan(b.x, b.z, 0, S === 'p' ? -0.8 : 0.8);
     g.serveData = plan;
-    b.vx = b.vz = 0; b.spin = 'none';
+    b.vx = b.vz = 0; setSpin(b, 0, 0);
     b.vy = Math.sqrt(2 * G * (Math.max(plan.y0 + 0.16, 0.4) - b.y));
     g.phase = 'toss';
     g.events.push({ kind: 'toss', who: S });
@@ -176,7 +217,7 @@
 
   function strikeServe(g) {
     const b = g.ball, plan = g.serveData, S = g.server;
-    b.y = plan.y0; b.vx = plan.v.vx; b.vy = plan.v.vy; b.vz = plan.v.vz; b.spin = 'none';
+    b.y = plan.y0; b.vx = plan.v.vx; b.vy = plan.v.vy; b.vz = plan.v.vz; setSpin(b, 0, 0);
     g.phase = 'serve'; g.hitter = S; g.serveOwn = false; g.recvBounced = false; g.netTouched = false; g.netHit = false;
     g.rallyHits = 1; g.totalHits[S]++;
     g.lastShot[S] = 'serve';
@@ -239,9 +280,10 @@
   }
 
   // ---------- shots ----------
+  // spin: { top, side } or the old names 'none' / 'top' / 'back'
   function launch(g, v, spin) {
-    const b = g.ball;
-    b.vx = v.vx; b.vy = v.vy; b.vz = v.vz; b.spin = spin;
+    const b = g.ball, w = toSpin(spin);
+    b.vx = v.vx; b.vy = v.vy; b.vz = v.vz; setSpin(b, w.top, w.side);
     g.recvBounced = false; g.netTouched = false; g.netHit = false;
     g.rallyHits++;
   }
@@ -250,37 +292,49 @@
     const b = g.ball, p = g.pad, d = g.diff;
     const off = clamp((b.x - p.x) / d.pReach, -1, 1);
     const push = -p.vz, side = p.vx;
-    let type = 'drive', Tf, zt, spin = 'none';
-    let sig = 0.05 + 0.11 * off * off;
+    const inc = { top: b.spinTop || 0, side: b.spinSide || 0 }; // 來球的旋轉
+    let type = 'drive', Tf, zt, top = 0;
+    let sig = 0.05 + 0.11 * off * off + SPINFX.recvSig * (Math.abs(inc.top) + Math.abs(inc.side));
     if (push > 1.0) {
       type = 'smash';
       const k = clamp((push - 1.0) / 1.6, 0, 1);
-      Tf = 0.36 - 0.07 * k; zt = -1.02 - 0.12 * rng(); spin = 'top'; sig += 0.04;
+      Tf = 0.36 - 0.07 * k; zt = -1.02 - 0.12 * rng(); top = SPINFX.smashTop; sig += 0.04;
     } else if (push < -0.8) {
-      type = 'drop'; Tf = 0.56; zt = -0.34 - 0.14 * rng(); spin = 'back';
+      type = 'drop'; Tf = 0.56; zt = -0.34 - 0.14 * rng(); top = -1;
+    } else if (push > 0.35) { // 輕推：上旋
+      type = 'loop'; top = 0.45 + 0.45 * clamp((push - 0.35) / 0.65, 0, 1);
+      Tf = 0.5 - 0.05 * clamp(push, 0, 1); zt = -0.8 - 0.35 * rng();
+    } else if (push < -0.3) { // 輕拉：下旋長球
+      type = 'chop'; top = -(0.45 + 0.45 * clamp((-push - 0.3) / 0.5, 0, 1));
+      Tf = 0.54; zt = -0.7 - 0.38 * rng();
     } else {
       Tf = 0.5 - 0.05 * clamp(push, 0, 1); zt = -0.72 - 0.4 * rng();
     }
+    // 快速左右揮：側旋，球往揮的方向彎（落點照舊，彎度算在瞄準裡）
+    const w = { top, side: Math.sign(side) * 0.9 * clamp((Math.abs(side) - 1.0) / 1.2, 0, 1) };
     if (d.key === 'easy') sig *= 0.6;
     let xt = 0.42 * off + 0.24 * side + gauss() * sig;
     xt = d.key === 'easy' ? clamp(xt, -0.72, 0.72) : clamp(xt, -1.3, 1.3);
     zt += gauss() * sig * 0.6;
-    let v = aimVelocity(b, xt, zt, Tf);
+    let v = aimVelocity(b, xt, zt, Tf, w);
     if (type !== 'smash' || b.y > 0.16) {
-      for (let n = 0; n < 14 && netMargin(b, v) < 0.02; n++) { Tf += 0.03; v = aimVelocity(b, xt, zt, Tf); }
+      for (let n = 0; n < 14 && netMargin(b, v, w) < 0.02; n++) { Tf += 0.03; v = aimVelocity(b, xt, zt, Tf, w); }
     }
+    const kick = receiveKick(inc, w);
+    v.vx += kick.vx; v.vy += kick.vy;
     g.hitter = 'p'; g.lastShot.p = type; g.totalHits.p++; p.swing = 1;
-    launch(g, v, spin);
-    g.events.push({ kind: 'hit', who: 'p', type, x: b.x, speed: Math.hypot(v.vx, v.vz) });
+    launch(g, v, w);
+    g.events.push({ kind: 'hit', who: 'p', type, x: b.x, speed: Math.hypot(v.vx, v.vz), spin: b.spin, spinTop: b.spinTop, spinSide: b.spinSide });
     planRobot(g);
   }
 
   function robotHit(g) {
     const b = g.ball, r = g.robot, d = g.diff, p = g.pad;
     const off = clamp(Math.abs(b.x - r.x) / d.rReach, 0, 1);
-    const inc = g.lastShot.p;
-    const errP = d.rErr + d.rErrK * (0.7 * off * off + (inc === 'smash' ? 0.7 : 0) + (inc === 'drop' ? 0.45 : 0));
-    let type = 'drive', v, spin = 'none';
+    const inc = g.lastShot.p, spinIn = Math.abs(b.spinTop || 0) + Math.abs(b.spinSide || 0);
+    const errP = d.rErr + d.rErrK * (0.7 * off * off + (inc === 'smash' ? 0.7 : 0) + (inc === 'drop' ? 0.45 : 0)) + d.rSpinErr * spinIn;
+    let type = 'drive', v;
+    const w = { top: 0, side: 0 };
     const awayX = () => -Math.sign(p.x || rng() - 0.5) * rand(0.35, 0.62);
     if (rng() < errP) {
       const m = rng();
@@ -295,16 +349,24 @@
       }
     } else {
       let xt, zt, Tf;
-      if (b.y > 0.3 && rng() < d.smash) { type = 'smash'; Tf = rand(0.3, 0.34); zt = rand(0.95, 1.15); xt = awayX(); spin = 'top'; }
-      else if (rng() < d.drop && p.z > 1.6) { type = 'drop'; Tf = 0.56; zt = rand(0.3, 0.42); xt = rand(-0.4, 0.4); spin = 'back'; }
-      else { Tf = rand(d.rTf[0], d.rTf[1]); zt = rand(0.55, 1.15); xt = d.corner > 0 && rng() < d.corner ? awayX() : rand(-d.spread, d.spread); }
-      v = aimVelocity(b, xt, zt, Tf);
-      for (let n = 0; n < 14 && netMargin(b, v) < 0.03; n++) { Tf += 0.03; v = aimVelocity(b, xt, zt, Tf); }
+      if (b.y > 0.3 && rng() < d.smash) { type = 'smash'; Tf = rand(0.3, 0.34); zt = rand(0.95, 1.15); xt = awayX(); w.top = SPINFX.smashTop; }
+      else if (rng() < d.drop && p.z > 1.6) { type = 'drop'; Tf = 0.56; zt = rand(0.3, 0.42); xt = rand(-0.4, 0.4); w.top = -1; }
+      else {
+        Tf = rand(d.rTf[0], d.rTf[1]); zt = rand(0.55, 1.15); xt = d.corner > 0 && rng() < d.corner ? awayX() : rand(-d.spread, d.spread);
+        if (rng() < d.spin) { // 旋轉球：上旋、下旋長球，或往外彎的側旋
+          const k = d.spinMax * rand(0.55, 1), m = rng();
+          if (m < 0.4) { type = 'loop'; w.top = k; }
+          else if (m < 0.75) { type = 'chop'; w.top = -k; Tf += 0.04; }
+          else { w.side = (xt >= 0 ? 1 : -1) * k; w.top = 0.3 * k; }
+        }
+      }
+      v = aimVelocity(b, xt, zt, Tf, w);
+      for (let n = 0; n < 14 && netMargin(b, v, w) < 0.03; n++) { Tf += 0.03; v = aimVelocity(b, xt, zt, Tf, w); }
     }
     g.hitter = 'r'; g.lastShot.r = type; g.totalHits.r++; r.swing = 1; r.plan = null;
-    launch(g, v, spin);
+    launch(g, v, w);
     g.hint = predictBounce(g, 'p');
-    g.events.push({ kind: 'hit', who: 'r', type, x: b.x, speed: Math.hypot(v.vx, v.vz) });
+    g.events.push({ kind: 'hit', who: 'r', type, x: b.x, speed: Math.hypot(v.vx, v.vz), spin: b.spin, spinTop: b.spinTop, spinSide: b.spinSide });
   }
 
   function checkHits(g) {
@@ -419,6 +481,6 @@
     p.y += (ty - p.y) * (1 - Math.exp(-dt * 16));
   }
 
-  const API = { _test: { point, resetForServe, afterPoint }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, setRng: (f) => { rng = f; } };
+  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, spinAccel, receiveKick, setRng: (f) => { rng = f; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.PingPong = API;
 })(this);

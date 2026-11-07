@@ -1,5 +1,5 @@
 // 自動對打測試：讓一個「測試機器人」代替玩家，在三種難度各打 20 局。
-// 檢查：每局都能正常打完、R-11 發球不會犯規、難度越高 R-11 拿的分越多。
+// 檢查：每局都能正常打完、R-11 發球不會犯規、難度越高 R-11 拿的分越多、打旋轉球也越多。
 // 執行：node selfplay.test.js
 const E = require('./engine.js');
 
@@ -25,7 +25,7 @@ function predictCross(g, zp) {
 function playGame(diff, seed) {
   const rnd = mulberry32(seed);
   const g = E.createGame(diff, { rng: mulberry32(seed + 1) });
-  const dt = 1 / 60, st = { robotServeFaults: 0 };
+  const dt = 1 / 60, st = { robotServeFaults: 0, robotHits: 0, robotSpin: 0 };
   let waitT = 0, plan = null, style = 'drive';
   for (let frame = 0; frame < 60 * 60 * 40 && g.phase !== 'over'; frame++) {
     const p = g.pad;
@@ -47,6 +47,7 @@ function playGame(diff, seed) {
     } else plan = null;
     E.update(g, dt);
     for (const e of g.events) if (e.kind === 'point' && e.reason === 'serveFault' && e.hitter === 'r') st.robotServeFaults++;
+    for (const e of g.events) if (e.kind === 'hit' && e.who === 'r' && e.type !== 'serve') { st.robotHits++; if (Math.abs(e.spinTop || 0) + Math.abs(e.spinSide || 0) > 0.2) st.robotSpin++; }
     g.events.length = 0;
   }
   return { g, st };
@@ -54,19 +55,21 @@ function playGame(diff, seed) {
 
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? '  通過  ' : '  失敗  ') + msg); if (!cond) fails++; };
-const robotPts = {};
+const robotPts = {}, spinRate = {};
 for (const diff of ['easy', 'normal', 'hard']) {
-  let unfinished = 0, faults = 0, pp = 0, pr = 0, longest = 0;
+  let unfinished = 0, faults = 0, pp = 0, pr = 0, longest = 0, rHits = 0, rSpin = 0;
   for (let s = 1; s <= 20; s++) {
     const { g, st } = playGame(diff, s * 131);
     if (!g.winner) unfinished++;
     faults += st.robotServeFaults; pp += g.score.p; pr += g.score.r; longest = Math.max(longest, g.longest);
+    rHits += st.robotHits; rSpin += st.robotSpin;
   }
-  robotPts[diff] = pr;
-  console.log(`${E.DIFFS[diff].name}：測試機器人 ${pp} 分、R-11 ${pr} 分，最長回合 ${longest} 拍`);
+  robotPts[diff] = pr; spinRate[diff] = rSpin / Math.max(1, rHits);
+  console.log(`${E.DIFFS[diff].name}：測試機器人 ${pp} 分、R-11 ${pr} 分，最長回合 ${longest} 拍，R-11 打旋轉球 ${Math.round(spinRate[diff] * 100)}%`);
   ok(unfinished === 0, `${E.DIFFS[diff].name} 20 局都正常打完`);
   ok(faults === 0, `${E.DIFFS[diff].name} R-11 發球沒有犯規`);
 }
 ok(robotPts.easy < robotPts.normal && robotPts.normal < robotPts.hard, '難度越高，R-11 拿的分越多');
+ok(spinRate.easy < spinRate.normal && spinRate.normal < spinRate.hard, '難度越高，R-11 越常打旋轉球');
 console.log(fails ? `\n${fails} 項失敗` : '\n全部通過');
 process.exit(fails ? 1 : 0);

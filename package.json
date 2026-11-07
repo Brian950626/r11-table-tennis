@@ -4,6 +4,6 @@
   "private": true,
   "description": "在瀏覽器裡跟機器人 R-11 打桌球",
   "scripts": {
-    "test": "node rules.test.js && node selfplay.test.js && node skins.test.js"
+    "test": "node rules.test.js && node spin.test.js && node selfplay.test.js && node skins.test.js"
   }
 }
