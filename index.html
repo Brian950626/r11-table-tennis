@@ -123,6 +123,28 @@ button { font: inherit; color: inherit; }
 .skin-desc { margin: -8px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); min-height: 1.5em; }
 .skin-desc b { color: var(--fg); font-weight: 700; }
 .howto-wrap { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+/* two-player mode: .game.pvp swaps the cpu-only / pvp-only pieces; player 2 is teal */
+.diffs.modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.game.pvp .cpu-only, .game:not(.pvp) .pvp-only { display: none !important; }
+.banner.p2 .main, .callout.p2 { color: var(--teal); }
+/* portrait two-player (.vert): players face each other across the phone. The score sits beside the net,
+   player 2's half of everything is turned 180° so it reads upright from the far end. */
+.mirror { position: absolute; inset: 0; transform: rotate(180deg); pointer-events: none; }
+.game:not(.vert) .mirror { display: none; }
+.game.vert .hud { top: 50%; transform: translateY(-50%); padding-top: 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.game.vert .tag, .game.vert .mid { display: none; }
+.game.vert .icon-btn { grid-column: 1; grid-row: 1; justify-self: start; }
+.game.vert .board { grid-column: 3; grid-row: 1; flex-direction: column-reverse; gap: 10px; }
+.game.vert .board .side:last-child { transform: rotate(180deg); }
+.game.vert .flip { width: 42px; height: 46px; font-size: 32px; }
+.game.vert .banner { top: 59%; }
+.game.vert .callout { top: 56%; }
+.game.vert .bottom.p2 { top: 0; bottom: auto; transform: rotate(180deg); }
+/* landscape two-player (.horiz): player 1 on the left, player 2 on the right */
+.game.horiz .bottom { right: 50%; }
+.game.horiz .bottom.p2 { left: 50%; right: 0; }
+.game.horiz .callout.p1 { right: 50%; }
+.game.horiz .callout.p2 { left: 50%; }
 @media (max-height: 560px) { .card { gap: 11px; padding: 16px; } .card h1 { font-size: 26px; } .lede { font-size: 13px; } }
 @media (prefers-reduced-motion: reduce) { .banner.show, .callout.show, .flip.anim span { animation: none; } }
 </style>
@@ -134,17 +156,21 @@ button { font: inherit; color: inherit; }
   <div class="hud">
     <span class="tag" id="diffTag">普通</span>
     <div class="board" aria-live="polite">
-      <div class="side"><span class="who">你</span><div class="flip" id="flipP"><span id="scP">0</span></div><span class="srv on" id="srvP">發球</span></div>
+      <div class="side"><span class="who" id="whoP">你</span><div class="flip" id="flipP"><span id="scP">0</span></div><span class="srv on" id="srvP">發球</span></div>
       <div class="mid"><span class="vs">VS</span><span class="status" id="status"></span><span class="rally" id="rally"></span></div>
-      <div class="side"><span class="who">R-11</span><div class="flip" id="flipR"><span id="scR">0</span></div><span class="srv" id="srvR">發球</span></div>
+      <div class="side"><span class="who" id="whoR">R-11</span><div class="flip" id="flipR"><span id="scR">0</span></div><span class="srv" id="srvR">發球</span></div>
     </div>
     <button class="icon-btn" id="bPause" type="button" aria-label="暫停"><i></i></button>
   </div>
 
   <div class="banner" id="banner" hidden><span class="main" id="bMain"></span><span class="sub" id="bSub"></span></div>
   <div class="callout" id="callout" hidden></div>
+  <div class="mirror" aria-hidden="true">
+    <div class="banner" id="banner2" hidden><span class="main" id="bMain2"></span><span class="sub" id="bSub2"></span></div>
+    <div class="callout" id="callout2" hidden></div>
+  </div>
 
-  <div class="bottom">
+  <div class="bottom" id="pvpBottom">
     <div class="tip" id="tip" hidden></div>
     <button class="serve-btn" id="bServe" type="button" hidden>發球</button>
   </div>
@@ -152,22 +178,35 @@ button { font: inherit; color: inherit; }
   <div class="overlay" id="menu">
     <div class="card">
       <p class="kicker">TABLE TENNIS · 11 POINTS</p>
-      <h1>對手：機器人 <span class="num">R-11</span></h1>
-      <p class="lede">一局 11 分。移動球拍接球，擊球那一下怎麼動，球就怎麼飛。</p>
-      <p class="label">難度</p>
+      <h1 class="cpu-only">對手：機器人 <span class="num">R-11</span></h1>
+      <h1 class="pvp-only">雙人對戰：玩家 <span class="num">1</span> 對 玩家 <span class="num">2</span></h1>
+      <p class="lede cpu-only">一局 11 分。移動球拍接球，擊球那一下怎麼動，球就怎麼飛。</p>
+      <p class="lede pvp-only">一局 11 分。兩個人在同一支手機或同一台電腦上對打，各自控制一支球拍。</p>
+      <p class="label">模式</p>
+      <div class="diffs modes" id="modes" role="group" aria-label="模式">
+        <button type="button" data-mode="cpu" aria-pressed="true"><b>對戰 R-11</b><small>一個人跟機器人打</small></button>
+        <button type="button" data-mode="pvp" aria-pressed="false"><b>雙人對戰</b><small>兩個人用同一台裝置對打</small></button>
+      </div>
+      <p class="label"><span class="cpu-only">難度</span><span class="pvp-only">球速</span></p>
       <div class="diffs" id="diffs" role="group" aria-label="難度">
         <button type="button" id="dEasy" data-diff="easy" aria-pressed="false"><b>簡單</b><small>球速慢，會標出落點</small></button>
-        <button type="button" id="dNormal" data-diff="normal" aria-pressed="true"><b>普通</b><small>會打你的反手角落</small></button>
-        <button type="button" id="dHard" data-diff="hard" aria-pressed="false"><b>困難</b><small>球速快，會扣殺和放短</small></button>
+        <button type="button" id="dNormal" data-diff="normal" aria-pressed="true"><b>普通</b><small class="cpu-only">會打你的反手角落</small><small class="pvp-only">標準球速</small></button>
+        <button type="button" id="dHard" data-diff="hard" aria-pressed="false"><b>困難</b><small class="cpu-only">球速快，會扣殺和放短</small><small class="pvp-only">球速快，要反應更快</small></button>
       </div>
-      <p class="label">機器人造型</p>
-      <div class="skins" id="skinsMenu" role="group" aria-label="機器人造型"></div>
-      <p class="skin-desc" id="skinDescMenu"></p>
+      <p class="label cpu-only">機器人造型</p>
+      <div class="skins cpu-only" id="skinsMenu" role="group" aria-label="機器人造型"></div>
+      <p class="skin-desc cpu-only" id="skinDescMenu"></p>
       <button class="primary" id="bStart" type="button">開始比賽</button>
       <label class="sound"><input type="checkbox" id="snd1" checked> 音效</label>
       <div class="howto-wrap">
       <p class="label">怎麼玩</p>
-      <dl class="howto">
+      <dl class="howto pvp-only">
+        <div><dt>手機</dt><dd>直拿平放在兩人中間，玩家 1 拖曳下半邊、玩家 2 拖曳上半邊，兩個人可以同時拖。點一下自己那半邊發球。</dd></div>
+        <div><dt>電腦</dt><dd>球桌橫放。玩家 1 在左邊，用 WASD 移動、空白鍵發球；玩家 2 在右邊，用方向鍵移動、Enter 發球。</dd></div>
+        <div><dt>擊球</dt><dd>擊球瞬間往網子推＝扣殺，往後拉＝放短，左右移動改變方向。</dd></div>
+        <div><dt>發球</dt><dd>左右移動瞄準，站得離桌越遠發得越長。</dd></div>
+      </dl>
+      <dl class="howto cpu-only">
         <div><dt>移動</dt><dd>手機在畫面上任意處拖曳；電腦移動滑鼠，或用方向鍵／WASD。</dd></div>
         <div><dt>方向</dt><dd>擊球瞬間往左或往右移動，球就往那邊飛；動太大會出界。</dd></div>
         <div><dt>扣殺</dt><dd>擊球瞬間往前推。球要彈得夠高再扣，低球容易掛網。</dd></div>
@@ -183,9 +222,9 @@ button { font: inherit; color: inherit; }
     <div class="card">
       <h2>暫停</h2>
       <p class="lede" id="pauseScore"></p>
-      <p class="label">機器人造型</p>
-      <div class="skins" id="skinsPause" role="group" aria-label="機器人造型"></div>
-      <p class="skin-desc" id="skinDescPause"></p>
+      <p class="label cpu-only">機器人造型</p>
+      <div class="skins cpu-only" id="skinsPause" role="group" aria-label="機器人造型"></div>
+      <p class="skin-desc cpu-only" id="skinDescPause"></p>
       <button class="primary" id="bResume" type="button">繼續</button>
       <div class="row">
         <button class="secondary" id="bRestart" type="button">重新開始</button>
@@ -200,12 +239,12 @@ button { font: inherit; color: inherit; }
       <div class="result">
         <p class="kicker" id="endKicker">GAME</p>
         <h2 id="endTitle">你贏了！</h2>
-        <div class="result-score"><div><small>你</small><span id="endP">11</span></div><span class="colon">:</span><div><small>R-11</small><span id="endR">7</span></div></div>
+        <div class="result-score"><div><small id="endWhoP">你</small><span id="endP">11</span></div><span class="colon">:</span><div><small id="endWhoR">R-11</small><span id="endR">7</span></div></div>
       </div>
       <div class="stats">
         <div><b id="stLong">0</b><span>最長回合（拍）</span></div>
-        <div><b id="stSmash">0</b><span>扣殺得分</span></div>
-        <div><b id="stHits">0</b><span>你的擊球數</span></div>
+        <div><b id="stSmash">0</b><span id="stSmashL">扣殺得分</span></div>
+        <div><b id="stHits">0</b><span id="stHitsL">你的擊球數</span></div>
       </div>
       <p class="lede" id="endNote"></p>
       <button class="primary" id="bAgain" type="button">再來一局</button>
@@ -235,8 +274,11 @@ button { font: inherit; color: inherit; }
     if (localStorage.getItem('r11-sound') === '0') soundOn = false;
     const k = localStorage.getItem('r11-skin'); if (k && SK.byId[k]) skinId = k;
   } catch (e) { /* storage unavailable */ }
+  // mode: 'cpu' = vs R-11, 'pvp' = two players on one device ('r' side becomes player 2)
+  let modeKey = 'cpu', pvpFirst = 'p';
+  try { if (localStorage.getItem('r11-mode') === 'pvp') modeKey = 'pvp'; } catch (e) { /* storage unavailable */ }
   const currentSkin = () => SK.byId[skinId] || SK.list[0];
-  let game = E.createGame(diffKey), running = false, paused = false, pointsPlayed = 0, lastPointer = coarse ? 'touch' : 'mouse';
+  let game = E.createGame(diffKey, { mode: modeKey }), running = false, paused = false, pointsPlayed = 0, lastPointer = coarse ? 'touch' : 'mouse';
   const input = { tx: 0, tz: PAD.restZ };
   const keys = new Set();
 
@@ -248,6 +290,7 @@ button { font: inherit; color: inherit; }
   function proj(x, y, z) {
     const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
     const d = -dy * sp - dz * cp, u = dy * cp - dz * sp;
+    if (cam.rot) return { x: cx0 + (f * u) / d, y: cy0 + (f * dx) / d, s: f / d }; // two-player landscape: table turned sideways
     return { x: cx0 + (f * dx) / d, y: cy0 - (f * u) / d, s: f / d };
   }
   function unproject(sx, sy, yp) {
@@ -257,7 +300,28 @@ button { font: inherit; color: inherit; }
     const t = (yp - cam.y) / dy;
     return { x: cam.x + dx * t, z: cam.z + dz * t };
   }
+  // two-player camera: straight down over the table so both ends look the same.
+  // Portrait: player 1 at the bottom, player 2 at the top. Landscape: player 1 on the left, player 2 on the right.
+  let f0 = 150; // pixels per metre at table height
+  function fitTopCamera() {
+    cam.rot = W > H * 1.05;
+    cam.x = 0; cam.z = 0; cam.y = 4.2; cam.pitch = Math.PI / 2; sp = 1; cp = 0;
+    if (cam.rot) {
+      const mt = clamp(H * 0.15, 84, 112), mb = clamp(H * 0.09, 52, 72);
+      f0 = Math.min((W - 16) / 4.3, (H - mt - mb) / 2.5);
+      cx0 = W / 2; cy0 = (mt + H - mb) / 2;
+    } else {
+      const m = clamp(H * 0.065, 46, 64);
+      f0 = Math.min((W - 16) / 2.6, (H - 2 * m) / 4.3);
+      cx0 = W / 2; cy0 = H / 2;
+    }
+    f = f0 * cam.y;
+  }
   function fitCamera() {
+    const pvp = game.mode === 'pvp';
+    gameEl.classList.toggle('vert', pvp && !(W > H * 1.05)); gameEl.classList.toggle('horiz', pvp && W > H * 1.05);
+    if (pvp) { fitTopCamera(); return; }
+    cam.rot = false; cam.x = 0;
     const t = clamp((H / W - 0.85) / (1.9 - 0.85), 0, 1);
     cam.y = 1.3 + (2.5 - 1.3) * t; cam.z = 3.55 + (3.0 - 3.55) * t; cam.pitch = ((20 + 12 * t) * Math.PI) / 180;
     sp = Math.sin(cam.pitch); cp = Math.cos(cam.pitch);
@@ -276,7 +340,9 @@ button { font: inherit; color: inherit; }
   function quad(c, a, b, d, e) { c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.lineTo(d.x, d.y); c.lineTo(e.x, e.y); c.closePath(); }
   function groundEllipse(c, x, y, z, r) {
     const P = proj(x, y, z), a = proj(x - r, y, z), b = proj(x + r, y, z), n = proj(x, y, z + r), m = proj(x, y, z - r);
-    c.beginPath(); c.ellipse(P.x, P.y, Math.max(0.5, Math.abs(b.x - a.x) / 2), Math.max(0.4, Math.abs(n.y - m.y) / 2), 0, 0, Math.PI * 2);
+    c.beginPath();
+    if (cam.rot) { c.ellipse(P.x, P.y, Math.max(0.5, Math.abs(n.x - m.x) / 2), Math.max(0.4, Math.abs(b.y - a.y) / 2), 0, 0, Math.PI * 2); return; }
+    c.ellipse(P.x, P.y, Math.max(0.5, Math.abs(b.x - a.x) / 2), Math.max(0.4, Math.abs(n.y - m.y) / 2), 0, 0, Math.PI * 2);
   }
 
   // ---------------- static layers ----------------
@@ -284,6 +350,7 @@ button { font: inherit; color: inherit; }
   function layerCtx(c) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); return x; }
 
   function buildArena() {
+    if (game.mode === 'pvp') { buildArenaTop(); return; }
     const c = layerCtx(layers.bg);
     const wallBase = proj(0, FLOOR, -4.4).y;
     let g = c.createLinearGradient(0, 0, 0, wallBase);
@@ -330,6 +397,35 @@ button { font: inherit; color: inherit; }
     c.fillStyle = 'rgba(0,0,0,0.38)'; c.fill();
   }
 
+  // two-player floor seen from above: each player's half is tinted in their colour and labelled
+  function buildArenaTop() {
+    const c = layerCtx(layers.bg);
+    c.fillStyle = '#141a40'; c.fillRect(0, 0, W, H);
+    const T = proj(0, 0, 0);
+    for (const [s, col] of [[1, '255,182,39'], [-1, '62,230,207']]) {
+      const E1 = proj(0, FLOOR, s * 2.4), rg = c.createRadialGradient(E1.x, E1.y, 4, E1.x, E1.y, Math.max(W, H) * 0.55);
+      rg.addColorStop(0, `rgba(${col},0.10)`); rg.addColorStop(1, `rgba(${col},0)`);
+      c.fillStyle = rg; c.fillRect(0, 0, W, H);
+    }
+    const rg = c.createRadialGradient(T.x, T.y, 10, T.x, T.y, Math.max(W, H) * 0.6);
+    rg.addColorStop(0, 'rgba(150,175,255,0.14)'); rg.addColorStop(1, 'rgba(150,175,255,0)');
+    c.fillStyle = rg; c.fillRect(0, 0, W, H);
+    c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1.2;
+    quad(c, proj(-2.6, FLOOR, -3.1), proj(2.6, FLOOR, -3.1), proj(2.6, FLOOR, 3.1), proj(-2.6, FLOOR, 3.1)); c.stroke();
+    // table shadow, light from the -x side
+    quad(c, proj(-HX + 0.2, FLOOR, -HZ - 0.04), proj(HX + 0.26, FLOOR, -HZ - 0.04), proj(HX + 0.26, FLOOR, HZ + 0.04), proj(-HX + 0.2, FLOOR, HZ + 0.04));
+    c.fillStyle = 'rgba(0,0,0,0.4)'; c.fill();
+    // "玩家 1" / "玩家 2" on the floor behind each end, upright for whoever stands there
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = `900 ${Math.round(clamp(f0 * 0.11, 12, 18))}px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif`;
+    for (const [s, label, col] of [[1, '玩家 1', 'rgba(255,182,39,0.4)'], [-1, '玩家 2', 'rgba(62,230,207,0.4)']]) {
+      const P = proj(0, FLOOR, s * 2.3);
+      c.save(); c.translate(P.x, P.y);
+      if (!cam.rot && s < 0) c.rotate(Math.PI);
+      c.fillStyle = col; c.fillText(label, 0, 0); c.restore();
+    }
+  }
+
   function buildTable() {
     const c = layerCtx(layers.table);
     // legs (near pair visible below the front edge)
@@ -342,7 +438,7 @@ button { font: inherit; color: inherit; }
     quad(c, D, C, proj(HX, -0.04, HZ), proj(-HX, -0.04, HZ)); c.fillStyle = '#11346a'; c.fill();
     const tg = c.createLinearGradient(0, A.y, 0, D.y);
     tg.addColorStop(0, '#174483'); tg.addColorStop(1, '#2366b8');
-    quad(c, A, B, C, D); c.fillStyle = tg; c.fill();
+    quad(c, A, B, C, D); c.fillStyle = game.mode === 'pvp' ? '#1f5aa6' : tg; c.fill(); // seen from above: one even colour
     // sheen
     c.save(); quad(c, A, B, C, D); c.clip();
     const sh = proj(0.25, 0, 0.3), sg = c.createRadialGradient(sh.x, sh.y, 4, sh.x, sh.y, Math.abs(C.x - D.x) * 0.7);
@@ -358,7 +454,22 @@ button { font: inherit; color: inherit; }
     c.strokeStyle = 'rgba(242,245,251,0.7)'; c.lineWidth = 1; c.beginPath(); c.moveTo(m0.x, m0.y); c.lineTo(m1.x, m1.y); c.stroke();
   }
 
+  // net seen from above: shadow, mesh strip, white tape and the two posts
+  function buildNetTop() {
+    const c = layerCtx(layers.net);
+    quad(c, proj(-NET_X + 0.04, 0.001, -0.012), proj(NET_X + 0.06, 0.001, -0.012), proj(NET_X + 0.06, 0.001, 0.012), proj(-NET_X + 0.04, 0.001, 0.012));
+    c.fillStyle = 'rgba(0,0,0,0.28)'; c.fill();
+    quad(c, proj(-NET_X, NET_H, -0.016), proj(NET_X, NET_H, -0.016), proj(NET_X, NET_H, 0.016), proj(-NET_X, NET_H, 0.016));
+    c.fillStyle = 'rgba(6,10,26,0.55)'; c.fill();
+    quad(c, proj(-NET_X, NET_H, -0.007), proj(NET_X, NET_H, -0.007), proj(NET_X, NET_H, 0.007), proj(-NET_X, NET_H, 0.007));
+    c.fillStyle = '#f2f5fb'; c.fill();
+    for (const sx of [-1, 1]) {
+      const P = proj(sx * NET_X, NET_H + 0.012, 0);
+      c.fillStyle = '#2c3048'; c.beginPath(); c.arc(P.x, P.y, Math.max(3, 0.03 * P.s), 0, Math.PI * 2); c.fill();
+    }
+  }
   function buildNet() {
+    if (game.mode === 'pvp') { buildNetTop(); return; }
     const c = layerCtx(layers.net);
     const a = proj(-NET_X, 0, 0), b = proj(NET_X, 0, 0), t1 = proj(NET_X, NET_H, 0), t0 = proj(-NET_X, NET_H, 0);
     quad(c, a, b, t1, t0); c.fillStyle = 'rgba(6,10,26,0.5)'; c.fill();
@@ -443,7 +554,8 @@ button { font: inherit; color: inherit; }
     const b = game.ball;
     const onTable = Math.abs(b.x) <= HX && Math.abs(b.z) <= HZ && b.y >= -0.005;
     const sy = onTable ? 0.002 : FLOOR + 0.002, h = Math.max(0, b.y - sy);
-    groundEllipse(ctx, b.x, sy, b.z, 0.026 * (1 + h * 0.9));
+    // seen from above the shadow is the height cue: light from the -x side pushes it out as the ball rises
+    groundEllipse(ctx, b.x + (isPvp() ? h * 0.3 : 0), sy, b.z, 0.026 * (1 + h * 0.9));
     ctx.fillStyle = `rgba(0,0,0,${(0.5 * Math.max(0.18, 1 - h / 1.4)).toFixed(3)})`; ctx.fill();
   }
   function drawBall(now) {
@@ -456,11 +568,12 @@ button { font: inherit; color: inherit; }
         ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
       }
     }
-    const P = proj(b.x, b.y, b.z), rad = Math.max(2.6, 0.03 * P.s);
-    const chance = game.phase === 'rally' && game.hitter === 'r' && game.recvBounced && b.z > 0 && b.y > 0.27;
+    const pvp = isPvp(), P = proj(b.x, b.y, b.z), rad = Math.max(2.6, 0.03 * P.s) * (pvp ? 1.15 + 0.9 * Math.max(0, b.y) : 1);
+    const toP2 = pvp && game.hitter === 'p' && b.z < 0; // two-player: player 2 gets the smash ring too
+    const chance = game.phase === 'rally' && (game.hitter === 'r' && b.z > 0 || toP2) && game.recvBounced && b.y > 0.27;
     if (chance) {
       const pulse = reduced ? 0.6 : 0.5 + 0.5 * Math.sin(now / 70);
-      ctx.strokeStyle = `rgba(255,182,39,${(0.45 + 0.4 * pulse).toFixed(3)})`; ctx.lineWidth = 2;
+      ctx.strokeStyle = `rgba(${toP2 ? '62,230,207' : '255,182,39'},${(0.45 + 0.4 * pulse).toFixed(3)})`; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(P.x, P.y, rad * (1.9 + 0.4 * pulse), 0, Math.PI * 2); ctx.stroke();
     }
     const g = ctx.createRadialGradient(P.x - rad * 0.35, P.y - rad * 0.4, rad * 0.1, P.x, P.y, rad);
@@ -469,31 +582,47 @@ button { font: inherit; color: inherit; }
   }
   function drawNetLayer(now) {
     const wob = netFlash > 0 && !reduced ? Math.sin(now / 18) * 1.6 * netFlash : 0;
-    ctx.drawImage(layers.net, 0, wob, W, H);
+    if (cam.rot) ctx.drawImage(layers.net, wob, 0, W, H); else ctx.drawImage(layers.net, 0, wob, W, H);
+  }
+  // two-player paddle seen from above: blade, handle pointing back at its player, and a faint bar showing its reach
+  function drawPaddleTop(p, who) {
+    const s = who === 'p' ? 1 : -1, P = proj(p.x, p.y, p.z), col = who === 'p' ? '255,182,39' : '62,230,207';
+    const L = proj(p.x - game.diff.pReach, p.y, p.z), R = proj(p.x + game.diff.pReach, p.y, p.z);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(${col},0.22)`; ctx.lineWidth = Math.max(3, 0.05 * P.s);
+    ctx.beginPath(); ctx.moveTo(L.x, L.y); ctx.lineTo(R.x, R.y); ctx.stroke();
+    const tilt = p.swing * 0.09 * s, H0 = proj(p.x, p.y, p.z + s * 0.06), H1 = proj(p.x + tilt, p.y, p.z + s * 0.17);
+    ctx.strokeStyle = '#c99357'; ctx.lineWidth = Math.max(3, 0.03 * P.s);
+    ctx.beginPath(); ctx.moveTo(H0.x, H0.y); ctx.lineTo(H1.x, H1.y); ctx.stroke();
+    const rad = 0.08 * P.s * (1 + 0.18 * p.swing);
+    ctx.beginPath(); ctx.arc(P.x, P.y, rad, 0, Math.PI * 2);
+    ctx.fillStyle = who === 'p' ? '#d7263d' : '#22222a'; ctx.fill();
+    ctx.lineWidth = Math.max(2, 0.016 * P.s); ctx.strokeStyle = `rgb(${col})`; ctx.stroke();
   }
   function drawGuides(now) {
     const g = game;
     // serve aim: predicted path of the serve
-    if (running && g.phase === 'serveWait' && g.server === 'p') {
+    const col = isPvp() && g.server === 'r' ? '62,230,207' : '255,182,39';
+    if (running && g.phase === 'serveWait' && (g.server === 'p' || isPvp())) {
       const b = g.ball, plan = E.servePlan(b.x, b.z, g.aim.x, g.aim.z);
       if (plan) {
         const s = { x: b.x, y: plan.y0, z: b.z, vx: plan.v.vx, vy: plan.v.vy, vz: plan.v.vz, spin: 'none' }, ev = [];
         let bounces = 0;
-        ctx.fillStyle = 'rgba(255,182,39,0.85)';
+        ctx.fillStyle = `rgba(${col},0.85)`;
         for (let k = 0; k < 140 && bounces < 2; k++) {
           ev.length = 0; E.stepBall(s, 1 / 110, ev);
           for (const e of ev) if (e.type === 'bounce') bounces++; else if (e.type !== 'netcord') bounces = 9;
           if (k % 3 === 0) { const P = proj(s.x, s.y, s.z); ctx.beginPath(); ctx.arc(P.x, P.y, Math.max(1.3, 0.008 * P.s), 0, Math.PI * 2); ctx.fill(); }
         }
         const pulse = reduced ? 0 : Math.sin(now / 160) * 0.006;
-        ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 2;
         groundEllipse(ctx, g.aim.x, 0.002, g.aim.z, 0.075 + pulse); ctx.stroke();
-        groundEllipse(ctx, g.aim.x, 0.002, g.aim.z, 0.02); ctx.fillStyle = '#ffb627'; ctx.fill();
+        groundEllipse(ctx, g.aim.x, 0.002, g.aim.z, 0.02); ctx.fillStyle = `rgb(${col})`; ctx.fill();
       }
     }
-    // easy mode: where the robot's ball will land
-    if (g.diff.hint && g.hint && g.hitter === 'r' && !g.recvBounced && (g.phase === 'rally' || g.phase === 'serve')) {
-      ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,182,39,0.85)'; ctx.lineWidth = 1.6;
+    // easy mode: where the robot's ball will land (two-player: where the ball lands for whoever receives)
+    if (g.diff.hint && g.hint && (g.hitter === 'r' || isPvp()) && !g.recvBounced && (g.phase === 'rally' || g.phase === 'serve')) {
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = isPvp() && g.hitter === 'p' ? 'rgba(62,230,207,0.85)' : 'rgba(255,182,39,0.85)'; ctx.lineWidth = 1.6;
       groundEllipse(ctx, g.hint.x, 0.002, g.hint.z, 0.06); ctx.stroke(); ctx.setLineDash([]);
     }
   }
@@ -526,11 +655,17 @@ button { font: inherit; color: inherit; }
     if (shake > 0 && !reduced) { ctx.translate((Math.random() - 0.5) * 6 * shake, (Math.random() - 0.5) * 6 * shake); shake = Math.max(0, shake - dt * 4); }
     netFlash = Math.max(0, netFlash - dt * 2.5);
     ctx.drawImage(layers.bg, 0, 0, W, H);
-    drawRobotBody(now);
+    if (!isPvp()) drawRobotBody(now);
     ctx.drawImage(layers.table, 0, 0, W, H);
     drawGuides(now);
     drawShadow();
-    const items = [
+    // two-player (seen from above): no robot; whatever is higher is drawn on top
+    const items = isPvp() ? [
+      { z: NET_H * 0.5, d: drawNetLayer },
+      { z: game.pad.y, d: () => drawPaddleTop(game.pad, 'p') },
+      { z: game.pad2.y, d: () => drawPaddleTop(game.pad2, 'r') },
+      { z: game.ball.y, d: drawBall },
+    ] : [
       { z: game.robot.z, d: drawRobotArm },
       { z: game.ball.z + 0.001, d: drawBall },
       { z: 0, d: drawNetLayer },
@@ -592,15 +727,20 @@ button { font: inherit; color: inherit; }
 
   // ---------------- HUD ----------------
   let bannerTimer = 0, calloutTimer = 0, queued = null;
+  // banner2 is the upside-down copy for player 2 in portrait two-player mode (hidden otherwise)
   function banner(main, sub, tone, ms) {
-    const el = $('banner');
-    $('bMain').textContent = main; $('bSub').textContent = sub || ''; $('bSub').hidden = !sub;
-    el.className = 'banner ' + (tone || ''); el.hidden = false; void el.offsetWidth; el.classList.add('show');
-    clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { el.hidden = true; if (queued) { const q = queued; queued = null; banner(q[0], q[1], q[2], q[3]); } }, ms || 1400);
+    for (const [id, m, s] of [['banner', 'bMain', 'bSub'], ['banner2', 'bMain2', 'bSub2']]) {
+      const el = $(id);
+      $(m).textContent = main; $(s).textContent = sub || ''; $(s).hidden = !sub;
+      el.className = 'banner ' + (tone || ''); el.hidden = false; void el.offsetWidth; el.classList.add('show');
+    }
+    clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { $('banner').hidden = true; $('banner2').hidden = true; if (queued) { const q = queued; queued = null; banner(q[0], q[1], q[2], q[3]); } }, ms || 1400);
   }
-  function callout(text, tone) {
-    const el = $('callout'); el.textContent = text; el.className = 'callout ' + (tone || ''); el.hidden = false; void el.offsetWidth; el.classList.add('show');
-    clearTimeout(calloutTimer); calloutTimer = setTimeout(() => { el.hidden = true; }, 900);
+  // who (two-player only): shown in the hitter's own half, upright for them
+  function callout(text, tone, who) {
+    const el = $(who === 'r' && gameEl.classList.contains('vert') ? 'callout2' : 'callout');
+    el.textContent = text; el.className = 'callout ' + (tone || '') + (who === 'p' ? ' p1' : ''); el.hidden = false; void el.offsetWidth; el.classList.add('show');
+    clearTimeout(el.hideT); el.hideT = setTimeout(() => { el.hidden = true; }, 900);
   }
   function flipScore(who, val) {
     const card = $(who === 'p' ? 'flipP' : 'flipR');
@@ -608,14 +748,39 @@ button { font: inherit; color: inherit; }
     card.classList.remove('anim'); void card.offsetWidth; card.classList.add('anim');
   }
   function setServer(s) { $('srvP').classList.toggle('on', s === 'p'); $('srvR').classList.toggle('on', s === 'r'); }
+  const isPvp = () => game.mode === 'pvp';
+  const nameOf = (s) => (isPvp() ? (s === 'p' ? '玩家 1' : '玩家 2') : s === 'p' ? '你' : 'R-11');
+  const toneOf = (s) => (s === 'p' ? 'good' : 'p2');
   function resetHud() {
     $('scP').textContent = game.score.p; $('scR').textContent = game.score.r;
     $('status').textContent = ''; $('rally').textContent = ''; setServer(game.server);
-    $('diffTag').textContent = game.diff.name;
+    $('diffTag').textContent = isPvp() ? `雙人 · ${game.diff.name}` : game.diff.name;
+    const pvp = isPvp();
+    $('whoP').textContent = $('endWhoP').textContent = nameOf('p');
+    $('whoR').textContent = $('endWhoR').textContent = nameOf('r');
+    $('stSmashL').textContent = pvp ? '玩家 1 擊球數' : '扣殺得分';
+    $('stHitsL').textContent = pvp ? '玩家 2 擊球數' : '你的擊球數';
+    $('bChange').textContent = pvp ? '換模式或球速' : '換難度或造型';
+    cv.setAttribute('aria-label', pvp ? '桌球場：雙人對戰，玩家 1 和玩家 2 各在球桌一端' : '桌球場：你在近端，機器人 R-11 在遠端');
   }
   let tipKey = '';
   function updateTip() {
     let html = '';
+    if (isPvp()) {
+      // two-player: only the serve tip, for whoever serves, in their own half
+      const srv = running && !paused && game.phase === 'serveWait';
+      if (srv && pointsPlayed < 4) {
+        html = lastPointer === 'touch' ? `${nameOf(game.server)}：拖曳自己那半邊<b>瞄準</b>，往後站發長球；<b>點一下</b>發球`
+          : game.server === 'p' ? '玩家 1：<b>WASD</b> 移動瞄準，往後站發長球；<b>空白鍵</b>發球'
+            : '玩家 2：<b>方向鍵</b>移動瞄準，往後站發長球；<b>Enter</b> 發球';
+      }
+      if (html !== tipKey) { tipKey = html; $('tip').innerHTML = html; $('tip').hidden = !html; }
+      $('pvpBottom').classList.toggle('p2', game.server === 'r');
+      if ($('bServe').hidden === srv) $('bServe').hidden = !srv;
+      const rt2 = (game.phase === 'rally' || game.phase === 'serve' || game.phase === 'dead') && game.rallyHits >= 2 ? `第 ${game.rallyHits} 拍` : '';
+      if ($('rally').textContent !== rt2) $('rally').textContent = rt2;
+      return;
+    }
     if (running && !paused && game.phase === 'serveWait' && game.server === 'p') {
       html = pointsPlayed < 4
         ? (lastPointer === 'mouse' ? '左右移動<b>瞄準</b>，離桌越遠發越長；<b>點擊</b>或<b>空白鍵</b>發球' : '拖曳左右<b>瞄準</b>，往下拉離桌越遠發越長')
@@ -635,7 +800,15 @@ button { font: inherit; color: inherit; }
   function onPoint(e) {
     pointsPlayed++;
     flipScore(e.winner, game.score[e.winner]);
-    Sound.point(e.winner === 'p');
+    Sound.point(e.winner === 'p' || isPvp());
+    if (isPvp()) {
+      const W = nameOf(e.winner), L = nameOf(e.winner === 'p' ? 'r' : 'p');
+      const why = { miss: `${L} 沒接到`, out: `${L} 打出界`, net: `${L} 掛網`, double: `${L} 沒接到短球`, ownSide: `${L} 失誤`, serveFault: `${L} 發球失誤` };
+      const won = e.hitter === e.winner && (e.reason === 'miss' || e.reason === 'double');
+      const main = e.over ? `${W} 拿下這局` : won && e.shot === 'smash' ? `${W} 扣殺得分！` : won && e.shot === 'drop' ? `${W} 放短得分！` : `${W} 得分`;
+      banner(main, why[e.reason], toneOf(e.winner));
+      return;
+    }
     if (e.winner === 'p') {
       const main = e.hitter === 'p' && e.shot === 'smash' && (e.reason === 'miss' || e.reason === 'double') ? '扣殺得分！'
         : e.hitter === 'p' && e.shot === 'drop' && (e.reason === 'miss' || e.reason === 'double') ? '放短得分！' : '得分！';
@@ -648,9 +821,10 @@ button { font: inherit; color: inherit; }
   function onServeReady(e) {
     setServer(e.server);
     trail.length = 0;
-    const st = e.deuce ? 'Deuce 平分' : e.gamePoint === 'p' ? '你的賽末點' : e.gamePoint === 'r' ? 'R-11 賽末點' : '';
+    const gp2 = isPvp() && e.gamePoint ? nameOf(e.gamePoint) : '';
+    const st = e.deuce ? 'Deuce 平分' : gp2 ? `${gp2} 賽末點` : e.gamePoint === 'p' ? '你的賽末點' : e.gamePoint === 'r' ? 'R-11 賽末點' : '';
     $('status').textContent = st;
-    if (!e.initial && st) queued = [st, e.deuce ? '要連拿 2 分才能贏' : e.gamePoint === 'p' ? '再拿 1 分就贏了' : '守住這一分', 'neutral', 1200];
+    if (!e.initial && st) queued = [st, e.deuce ? '要連拿 2 分才能贏' : gp2 ? `${gp2} 再拿 1 分就贏了` : e.gamePoint === 'p' ? '再拿 1 分就贏了' : '守住這一分', 'neutral', 1200];
   }
   function onGameOver(e) {
     const win = e.winner === 'p';
@@ -663,6 +837,12 @@ button { font: inherit; color: inherit; }
       $('endNote').textContent = win
         ? (game.diff.key === 'hard' ? '連困難的 R-11 都擋不住你。' : '可以挑戰更高的難度了。')
         : '多用左右移動把球打到 R-11 的兩邊，等高球再扣殺。';
+      if (isPvp()) {
+        $('endKicker').textContent = `雙人對戰 · ${game.diff.name}`;
+        $('endTitle').textContent = `${nameOf(e.winner)} 獲勝！`;
+        $('stSmash').textContent = game.totalHits.p; $('stHits').textContent = game.totalHits.r;
+        $('endNote').textContent = `再來一局的話，換${nameOf(pvpFirst === 'p' ? 'r' : 'p')} 先發球。`;
+      }
       $('endMenu').hidden = false; $('bAgain').focus();
     }, 500);
   }
@@ -674,7 +854,10 @@ button { font: inherit; color: inherit; }
           const b = game.ball;
           Sound.hit(e.type, pan(e.x));
           sparks(b.x, b.y, b.z, e.who === 'p' ? '#ffb627' : '#3ee6cf', e.type === 'smash' ? 14 : 6, e.type === 'smash' ? 1.5 : 1);
-          if (e.who === 'p' && e.type === 'smash') { callout('扣殺！', 'good'); shake = 1; }
+          if (isPvp()) {
+            if (e.type === 'smash') { callout(`${nameOf(e.who)} 扣殺！`, toneOf(e.who), e.who); shake = 0.8; }
+            else if (e.type === 'drop') callout(`${nameOf(e.who)} 放短`, toneOf(e.who), e.who);
+          } else if (e.who === 'p' && e.type === 'smash') { callout('扣殺！', 'good'); shake = 1; }
           else if (e.who === 'p' && e.type === 'drop') callout('放短', 'good');
           else if (e.who === 'r' && e.type === 'smash') { callout('R-11 扣殺！', 'bad'); shake = 0.6; }
           break;
@@ -695,14 +878,55 @@ button { font: inherit; color: inherit; }
 
   // ---------------- input ----------------
   function clampInput() { input.tx = clamp(input.tx, PAD.xMin, PAD.xMax); input.tz = clamp(input.tz, PAD.zMin, PAD.zMax); }
-  function tryServe() { if (running && !paused && game.phase === 'serveWait' && game.server === 'p') { Sound.init(); E.serve(game); } }
+  // who: 'p' = you / player 1, 'r' = player 2 (two-player mode only)
+  function tryServe(who) { who = who === 'r' ? 'r' : 'p'; if (running && !paused && game.phase === 'serveWait' && game.server === who) { Sound.init(); E.serve(game, who); } }
   function mouseTo(e) {
     const r = cv.getBoundingClientRect(), p = unproject(e.clientX - r.left, e.clientY - r.top, 0.15);
     if (p) { input.tx = p.x; input.tz = p.z; clampInput(); }
   }
+  // two-player: each pointer belongs to the half of the screen it went down in, tracked by pointerId,
+  // so both players can drag at the same time; a tap in your half serves
+  const input2 = { tx: 0, tz: -PAD.restZ };
+  // which player's half a screen point is in: split at the net (portrait: below = player 1; landscape: left = player 1)
+  function zoneOf(clientX, clientY) {
+    const r = cv.getBoundingClientRect(), N = proj(0, 0, 0);
+    return cam.rot ? (clientX - r.left < N.x ? 'p' : 'r') : (clientY - r.top > N.y ? 'p' : 'r');
+  }
+  // screen direction -> world direction (x, z) for the top-down camera
+  function keyToWorld(sx, sy) { return cam.rot ? { x: sy, z: -sx } : { x: sx, z: sy }; }
+  // finger drag in pixels -> paddle move in metres; the paddle goes the way the finger goes on screen
+  function dragToWorld(dx, dy) {
+    const w = keyToWorld(dx, dy);
+    return { x: (w.x * 1.6) / f0, z: (w.z * 1.25) / f0 };
+  }
+  function clampInput2() { input2.tx = clamp(input2.tx, PAD.xMin, PAD.xMax); input2.tz = clamp(input2.tz, -PAD.zMax, -PAD.zMin); }
+  const touches = new Map();
+  function releaseTouches() { touches.clear(); }
+  function pvpDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const who = zoneOf(e.clientX, e.clientY);
+    for (const [id, t] of touches) if (t.who === who) touches.delete(id); // newest finger in a half wins
+    touches.set(e.pointerId, { who, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now() });
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    e.preventDefault();
+  }
+  function pvpMove(e) {
+    const t = touches.get(e.pointerId);
+    if (!t) return;
+    const d = dragToWorld(e.clientX - t.x, e.clientY - t.y);
+    t.x = e.clientX; t.y = e.clientY;
+    if (t.who === 'p') { input.tx += d.x; input.tz += d.z; clampInput(); } else { input2.tx += d.x; input2.tz += d.z; clampInput2(); }
+  }
+  function pvpUp(e) {
+    const t = touches.get(e.pointerId);
+    if (!t) return;
+    touches.delete(e.pointerId);
+    if (Math.hypot(e.clientX - t.sx, e.clientY - t.sy) < 10 && performance.now() - t.t < 400) tryServe(t.who);
+  }
   let drag = null;
   cv.addEventListener('pointerdown', (e) => {
     lastPointer = e.pointerType === 'mouse' ? 'mouse' : 'touch';
+    if (isPvp()) { pvpDown(e); return; }
     if (e.pointerType === 'mouse') { if (e.button === 0) { mouseTo(e); drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t: performance.now(), mouse: true }; } return; }
     if (drag) return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now() };
@@ -710,6 +934,7 @@ button { font: inherit; color: inherit; }
     e.preventDefault();
   });
   cv.addEventListener('pointermove', (e) => {
+    if (isPvp()) { pvpMove(e); return; }
     if (e.pointerType === 'mouse') { lastPointer = 'mouse'; mouseTo(e); return; }
     if (!drag || drag.id !== e.pointerId) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -719,26 +944,39 @@ button { font: inherit; color: inherit; }
     clampInput();
   });
   function endDrag(e) {
+    if (isPvp()) { pvpUp(e); return; }
     if (!drag || drag.id !== e.pointerId) return;
     const moved = Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy), quick = performance.now() - drag.t < 400;
     drag = null;
     if (moved < 10 && quick) tryServe();
   }
   cv.addEventListener('pointerup', endDrag);
-  cv.addEventListener('pointercancel', (e) => { if (drag && drag.id === e.pointerId) drag = null; });
+  cv.addEventListener('pointercancel', (e) => { touches.delete(e.pointerId); if (drag && drag.id === e.pointerId) drag = null; });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
   const MOVE_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS'];
   window.addEventListener('keydown', (e) => {
     if (!running) return;
     if (MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastPointer = 'mouse'; e.preventDefault(); }
-    else if ((e.code === 'Space' || e.code === 'Enter') && !paused && $('endMenu').hidden) { if (document.activeElement && document.activeElement.tagName === 'BUTTON' && e.code === 'Enter') return; tryServe(); e.preventDefault(); }
+    else if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter') && !paused && $('endMenu').hidden) {
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON' && e.code !== 'Space') return;
+      tryServe(isPvp() && e.code !== 'Space' ? 'r' : 'p'); e.preventDefault(); // two-player: Space = player 1, Enter = player 2
+    }
     else if (e.code === 'Escape' || e.code === 'KeyP') { if ($('endMenu').hidden) (paused ? resume() : pause()); }
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
   window.addEventListener('blur', () => keys.clear());
+  const keyDir = (l, r, u, d) => ({ x: (keys.has(r) ? 1 : 0) - (keys.has(l) ? 1 : 0), y: (keys.has(d) ? 1 : 0) - (keys.has(u) ? 1 : 0) });
   function applyKeys(dt) {
     if (!keys.size) return;
+    if (isPvp()) {
+      // player 1: WASD, player 2: arrow keys; both move the way the key points on screen
+      const k1 = keyDir('KeyA', 'KeyD', 'KeyW', 'KeyS'), k2 = keyDir('ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown');
+      const d1 = keyToWorld(k1.x, k1.y), d2 = keyToWorld(k2.x, k2.y);
+      input.tx += d1.x * 2.1 * dt; input.tz += d1.z * 1.8 * dt; clampInput();
+      input2.tx += d2.x * 2.1 * dt; input2.tz += d2.z * 1.8 * dt; clampInput2();
+      return;
+    }
     const l = keys.has('ArrowLeft') || keys.has('KeyA'), r = keys.has('ArrowRight') || keys.has('KeyD');
     const u = keys.has('ArrowUp') || keys.has('KeyW'), d = keys.has('ArrowDown') || keys.has('KeyS');
     input.tx += ((r ? 1 : 0) - (l ? 1 : 0)) * 2.1 * dt;
@@ -751,6 +989,13 @@ button { font: inherit; color: inherit; }
     diffKey = k;
     for (const b of $('diffs').querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset.diff === k ? 'true' : 'false');
     try { localStorage.setItem('r11-diff', k); } catch (e) { /* ignore */ }
+  }
+  function setMode(m) {
+    modeKey = m === 'pvp' ? 'pvp' : 'cpu';
+    for (const b of $('modes').querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset.mode === modeKey ? 'true' : 'false');
+    gameEl.classList.toggle('pvp', modeKey === 'pvp');
+    try { localStorage.setItem('r11-mode', modeKey); } catch (e) { /* ignore */ }
+    if (!running && game.mode !== modeKey) { game = E.createGame(diffKey, { mode: modeKey }); game.events.length = 0; resetHud(); resize(); }
   }
   function setSound(on) {
     soundOn = on; $('snd1').checked = on; $('snd2').checked = on;
@@ -808,31 +1053,38 @@ button { font: inherit; color: inherit; }
 
   function start() {
     Sound.init();
-    game = E.createGame(diffKey);
+    // two-player rematch: the other player serves first
+    if (modeKey === 'pvp' && game.mode === 'pvp' && game.phase === 'over') pvpFirst = pvpFirst === 'p' ? 'r' : 'p';
+    game = E.createGame(diffKey, { mode: modeKey, first: modeKey === 'pvp' ? pvpFirst : 'p' });
     game.events.length = 0;
     input.tx = 0; input.tz = PAD.restZ; game.pad.tx = 0; game.pad.tz = PAD.restZ;
+    input2.tx = 0; input2.tz = -PAD.restZ; game.pad2.tx = 0; game.pad2.tz = -PAD.restZ;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     running = true; paused = false; pointsPlayed = 0; trail.length = 0; fx.length = 0; queued = null;
     $('menu').hidden = true; $('pauseMenu').hidden = true; $('endMenu').hidden = true; $('banner').hidden = true;
     gameEl.classList.add('playing');
     resetHud();
-    banner('比賽開始', game.server === 'p' ? '你先發球' : 'R-11 先發球', '', 1100);
+    banner('比賽開始', isPvp() ? `${nameOf(game.server)} 先發球` : game.server === 'p' ? '你先發球' : 'R-11 先發球', '', 1100);
   }
   function pause() {
     if (!running || paused || game.phase === 'over') return;
-    paused = true; keys.clear();
-    $('pauseScore').textContent = `比分 你 ${game.score.p} : ${game.score.r} R-11　·　${game.diff.name}`;
+    paused = true; keys.clear(); releaseTouches();
+    $('pauseScore').textContent = isPvp()
+      ? `比分 玩家 1 ${game.score.p} : ${game.score.r} 玩家 2　·　球速${game.diff.name}`
+      : `比分 你 ${game.score.p} : ${game.score.r} R-11　·　${game.diff.name}`;
     $('pauseMenu').hidden = false; gameEl.classList.remove('playing'); $('bResume').focus();
   }
   function resume() { paused = false; $('pauseMenu').hidden = true; gameEl.classList.add('playing'); Sound.init(); last = performance.now(); }
   function toMenu() {
     running = false; paused = false;
     $('pauseMenu').hidden = true; $('endMenu').hidden = true; $('menu').hidden = false; gameEl.classList.remove('playing');
-    game = E.createGame(diffKey); game.events.length = 0; resetHud(); $('bStart').focus();
+    game = E.createGame(diffKey, { mode: modeKey }); game.events.length = 0; resetHud(); $('bStart').focus();
   }
 
+  $('modes').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
   $('diffs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setDiff(b.dataset.diff); });
   $('bStart').addEventListener('click', start);
-  $('bServe').addEventListener('click', tryServe);
+  $('bServe').addEventListener('click', () => tryServe(isPvp() ? game.server : 'p'));
   $('bPause').addEventListener('click', () => (paused ? resume() : pause()));
   $('bResume').addEventListener('click', resume);
   $('bRestart').addEventListener('click', start);
@@ -850,6 +1102,7 @@ button { font: inherit; color: inherit; }
     if (running && !paused) {
       applyKeys(dt);
       game.pad.tx = input.tx; game.pad.tz = input.tz;
+      game.pad2.tx = input2.tx; game.pad2.tz = input2.tz;
       E.update(game, dt);
       handleEvents();
       const b = game.ball;
@@ -872,7 +1125,7 @@ button { font: inherit; color: inherit; }
     if (typeof data.soundOn === 'boolean') soundOn = data.soundOn;
     if (data.skinId && SK.byId[data.skinId]) skinId = data.skinId;
     buildPicker('skinsMenu', 'skinDescMenu'); buildPicker('skinsPause', 'skinDescPause');
-    setDiff(diffKey); setSound(soundOn); setSkin(skinId, false);
+    setDiff(diffKey); setSound(soundOn); setSkin(skinId, false); setMode(modeKey);
     new ResizeObserver(resize).observe(gameEl);
     resize();
     if (data.score && data.running) {

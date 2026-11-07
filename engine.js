@@ -105,10 +105,12 @@
   }
 
   // ---------- game ----------
+  // opts.mode：'cpu'（預設，對戰 R-11）或 'pvp'（雙人對戰：'r' 那一邊改由玩家 2 用 pad2 操控）
   function createGame(diffKey, opts) {
     opts = opts || {};
     if (opts.rng) rng = opts.rng;
     const g = {
+      mode: opts.mode === 'pvp' ? 'pvp' : 'cpu',
       diff: DIFFS[diffKey] || DIFFS.normal,
       score: { p: 0, r: 0 }, first: opts.first || 'p', server: 'p',
       phase: 'serveWait', timer: 0, hitter: 'p',
@@ -116,6 +118,8 @@
       ball: { x: 0, y: 0.12, z: PAD.restZ, vx: 0, vy: 0, vz: 0, spin: 'none' },
       pad: { x: 0, y: 0.2, z: PAD.restZ, vx: 0, vz: 0, tx: 0, tz: PAD.restZ, lock: false, swing: 0 },
       robot: { x: 0, y: 0.2, z: ROB.zRest, plan: null, react: 0, noise: 0, lock: false, swing: 0, mood: 'idle', moodT: 0, tossHand: 0 },
+      // 雙人模式玩家 2 的球拍：世界座標，在遠端（z < 0），可動範圍是 PAD 前後翻過來
+      pad2: { x: 0, y: 0.2, z: -PAD.restZ, vx: 0, vz: 0, tx: 0, tz: -PAD.restZ, lock: false, swing: 0 },
       rallyHits: 0, longest: 0, smashWins: 0, totalHits: { p: 0, r: 0 },
       aim: { x: 0, z: -0.8 }, serveData: null, lastShot: { p: 'drive', r: 'drive' },
       hint: null, winner: null, events: [], time: 0,
@@ -125,13 +129,17 @@
   }
 
   function otherSide(s) { return s === 'p' ? 'r' : 'p'; }
+  // 某一邊的玩家球拍：'p' 是玩家（玩家 1），'r' 只有雙人模式才有（玩家 2）
+  function padOf(g, s) { return s === 'r' ? g.pad2 : g.pad; }
+  const human = (g, s) => s === 'p' || g.mode === 'pvp';
 
   function resetForServe(g, initial) {
     const sp = g.score.p, sr = g.score.r, n = sp + sr, other = otherSide(g.first);
     g.server = sp >= 10 && sr >= 10 ? (n % 2 === 0 ? g.first : other) : Math.floor(n / 2) % 2 === 0 ? g.first : other;
-    g.phase = 'serveWait'; g.timer = g.server === 'r' ? 1.1 : 0;
+    g.phase = 'serveWait'; g.timer = human(g, g.server) ? 0 : 1.1;
     g.hitter = g.server; g.serveOwn = false; g.recvBounced = false; g.netTouched = false; g.netHit = false;
     g.rallyHits = 0; g.pad.lock = false; g.robot.lock = false; g.robot.plan = null; g.hint = null; g.serveData = null;
+    g.pad2.lock = false;
     const b = g.ball; b.vx = b.vy = b.vz = 0; b.spin = 'none';
     holdBall(g);
     const gp = sp >= 10 && sp > sr ? 'p' : sr >= 10 && sr > sp ? 'r' : null;
@@ -141,24 +149,28 @@
   function holdBall(g) {
     const b = g.ball;
     if (g.server === 'p') { b.x = clamp(g.pad.x - 0.13, -1.0, 1.0); b.z = Math.max(g.pad.z, 1.45) - 0.02; b.y = 0.12; }
+    else if (g.mode === 'pvp') { b.x = clamp(g.pad2.x + 0.13, -1.0, 1.0); b.z = Math.min(g.pad2.z, -1.45) + 0.02; b.y = 0.12; }
     else { b.x = clamp(g.robot.x + 0.13, -1.0, 1.0); b.z = Math.min(g.robot.z, -1.45) + 0.02; b.y = 0.12; }
   }
 
+  // 發球瞄準點跟著發球那一方的球拍走（雙人模式玩家 2 發球時前後翻過來）
   function updateAim(g) {
-    const p = g.pad;
-    const zn = clamp((p.z - 1.4) / (PAD.zMax - 1.4), 0, 1);
+    const s = g.server === 'r' ? -1 : 1, p = padOf(g, g.server);
+    const zn = clamp((s * p.z - 1.4) / (PAD.zMax - 1.4), 0, 1);
     g.aim.x = clamp(p.x * 0.85, -0.62, 0.62);
-    g.aim.z = -(0.42 + 0.78 * zn);
+    g.aim.z = -s * (0.42 + 0.78 * zn);
   }
 
-  function serve(g) {
-    if (g.phase === 'serveWait' && g.server === 'p') startToss(g);
+  // who：'p'（玩家、玩家 1）或 'r'（雙人模式的玩家 2）；不是他發球就不理
+  function serve(g, who) {
+    who = who || 'p';
+    if (g.phase === 'serveWait' && g.server === who && human(g, who)) startToss(g);
   }
 
   function startToss(g) {
     const S = g.server, b = g.ball;
     let x2, z2;
-    if (S === 'p') { updateAim(g); x2 = g.aim.x; z2 = g.aim.z; g.pad.lock = true; }
+    if (human(g, S)) { updateAim(g); x2 = g.aim.x; z2 = g.aim.z; padOf(g, S).lock = true; }
     else {
       const d = g.diff, r = rng();
       x2 = d.corner > 0 && rng() < d.corner ? Math.sign(rng() - 0.5) * rand(0.35, 0.6) : rand(-d.spread, d.spread);
@@ -180,7 +192,8 @@
     g.phase = 'serve'; g.hitter = S; g.serveOwn = false; g.recvBounced = false; g.netTouched = false; g.netHit = false;
     g.rallyHits = 1; g.totalHits[S]++;
     g.lastShot[S] = 'serve';
-    if (S === 'p') { g.pad.swing = 1; g.pad.lock = false; planRobot(g); }
+    if (g.mode === 'pvp') { const p = padOf(g, S); p.swing = 1; p.lock = false; g.hint = predictBounce(g, otherSide(S)); }
+    else if (S === 'p') { g.pad.swing = 1; g.pad.lock = false; planRobot(g); }
     else { g.robot.swing = 1; g.robot.lock = false; g.hint = predictBounce(g, 'p'); }
     g.events.push({ kind: 'hit', who: S, type: 'serve', x: b.x });
   }
@@ -246,10 +259,13 @@
     g.rallyHits++;
   }
 
-  function playerHit(g) {
-    const b = g.ball, p = g.pad, d = g.diff;
-    const off = clamp((b.x - p.x) / d.pReach, -1, 1);
-    const push = -p.vz, side = p.vx;
+  // who：'p'（玩家、玩家 1）或 'r'（雙人模式的玩家 2）。
+  // 都在擊球者自己的視角算（s = -1 時左右、前後翻過來），瞄準點最後再轉回世界座標。
+  function playerHit(g, who) {
+    who = who === 'r' ? 'r' : 'p';
+    const s = who === 'r' ? -1 : 1, b = g.ball, p = padOf(g, who), d = g.diff;
+    const off = clamp((s * (b.x - p.x)) / d.pReach, -1, 1);
+    const push = -s * p.vz, side = s * p.vx;
     let type = 'drive', Tf, zt, spin = 'none';
     let sig = 0.05 + 0.11 * off * off;
     if (push > 1.0) {
@@ -265,14 +281,16 @@
     let xt = 0.42 * off + 0.24 * side + gauss() * sig;
     xt = d.key === 'easy' ? clamp(xt, -0.72, 0.72) : clamp(xt, -1.3, 1.3);
     zt += gauss() * sig * 0.6;
+    xt *= s; zt *= s;
     let v = aimVelocity(b, xt, zt, Tf);
     if (type !== 'smash' || b.y > 0.16) {
       for (let n = 0; n < 14 && netMargin(b, v) < 0.02; n++) { Tf += 0.03; v = aimVelocity(b, xt, zt, Tf); }
     }
-    g.hitter = 'p'; g.lastShot.p = type; g.totalHits.p++; p.swing = 1;
+    g.hitter = who; g.lastShot[who] = type; g.totalHits[who]++; p.swing = 1;
     launch(g, v, spin);
-    g.events.push({ kind: 'hit', who: 'p', type, x: b.x, speed: Math.hypot(v.vx, v.vz) });
-    planRobot(g);
+    g.events.push({ kind: 'hit', who, type, x: b.x, speed: Math.hypot(v.vx, v.vz) });
+    if (g.mode === 'pvp') g.hint = predictBounce(g, otherSide(who));
+    else planRobot(g);
   }
 
   function robotHit(g) {
@@ -313,6 +331,9 @@
     if (g.hitter === 'r' && b.vz > 0) {
       const p = g.pad;
       if (Math.abs(b.z - p.z) < 0.075 && Math.abs(b.x - p.x) < g.diff.pReach && b.y > -0.1 && b.y < 0.9) playerHit(g);
+    } else if (g.hitter === 'p' && b.vz < 0 && g.mode === 'pvp') {
+      const q = g.pad2;
+      if (Math.abs(b.z - q.z) < 0.075 && Math.abs(b.x - q.x) < g.diff.pReach && b.y > -0.1 && b.y < 0.9) playerHit(g, 'r');
     } else if (g.hitter === 'p' && b.vz < 0) {
       const r = g.robot;
       if (Math.abs(b.z - r.z) < 0.075 && Math.abs(b.x - r.x) < g.diff.rReach && b.y > -0.1 && b.y < 0.9) robotHit(g);
@@ -359,6 +380,7 @@
   }
 
   function moveRobot(g, h) {
+    if (g.mode === 'pvp') return; // 雙人模式沒有 R-11
     const r = g.robot, d = g.diff, b = g.ball;
     if (r.lock) { r.x = b.x; r.z = Math.min(b.z - 0.03, -1.4); r.y = b.y; return; }
     let tx = r.x * 0.995, tz = ROB.zRest;
@@ -377,12 +399,13 @@
   function substep(g, h) {
     const b = g.ball, ev = [];
     if (g.phase === 'serveWait') {
-      if (g.server === 'p') updateAim(g);
+      if (human(g, g.server)) updateAim(g);
       holdBall(g); moveRobot(g, h); return;
     }
     if (g.phase === 'toss') {
       stepBall(b, h, ev);
       if (g.server === 'p') { g.pad.x = b.x; g.pad.z = b.z + 0.03; }
+      else if (g.mode === 'pvp') { g.pad2.x = b.x; g.pad2.z = b.z - 0.03; }
       if (b.vy < 0 && b.y <= g.serveData.y0) strikeServe(g);
       moveRobot(g, h); return;
     }
@@ -392,33 +415,44 @@
     moveRobot(g, h);
   }
 
-  // dt in real seconds. Paddle target (pad.tx, pad.tz) is set by the input layer.
-  function update(g, dt) {
-    dt = Math.min(dt, 0.05);
-    g.time += dt;
-    const p = g.pad, b = g.ball;
+  // paddle follows its target (tx, tz); its smoothed velocity decides the shot
+  function movePad(p, dt, zLo, zHi) {
     if (!p.lock) {
       const k = 1 - Math.exp(-dt * 24);
       const nx = p.x + (clamp(p.tx, PAD.xMin, PAD.xMax) - p.x) * k;
-      const nz = p.z + (clamp(p.tz, PAD.zMin, PAD.zMax) - p.z) * k;
+      const nz = p.z + (clamp(p.tz, zLo, zHi) - p.z) * k;
       const a = 1 - Math.exp(-dt / 0.07);
       p.vx += ((nx - p.x) / Math.max(dt, 1e-4) - p.vx) * a;
       p.vz += ((nz - p.z) / Math.max(dt, 1e-4) - p.vz) * a;
       p.x = nx; p.z = nz;
     } else { p.vx *= 0.8; p.vz *= 0.8; }
     p.swing = Math.max(0, p.swing - dt * 5);
+  }
+  // paddle rises to meet a ball coming its way
+  function padHeight(p, b, coming, dt) {
+    const ty = p.lock ? b.y : coming ? clamp(b.y, -0.05, 0.7) : 0.2;
+    p.y += (ty - p.y) * (1 - Math.exp(-dt * 16));
+  }
+
+  // dt in real seconds. Paddle targets (pad.tx, pad.tz; pad2 in two-player mode) are set by the input layer.
+  function update(g, dt) {
+    dt = Math.min(dt, 0.05);
+    g.time += dt;
+    const p = g.pad, b = g.ball, pvp = g.mode === 'pvp';
+    movePad(p, dt, PAD.zMin, PAD.zMax);
+    if (pvp) movePad(g.pad2, dt, -PAD.zMax, -PAD.zMin);
     g.robot.swing = Math.max(0, g.robot.swing - dt * 5);
     if (g.robot.moodT > 0) { g.robot.moodT -= dt; if (g.robot.moodT <= 0) g.robot.mood = 'idle'; }
     if (g.phase === 'over') return;
     let rem = dt * g.diff.ts;
     while (rem > 1e-10) { const h = Math.min(SUB, rem); substep(g, h); rem -= h; }
     if (g.phase === 'dead') { g.timer -= dt; if (g.timer <= 0) afterPoint(g); }
-    else if (g.phase === 'serveWait' && g.server === 'r') { g.timer -= dt; if (g.timer <= 0) startToss(g); }
-    const coming = (g.phase === 'rally' || g.phase === 'serve') && g.hitter === 'r' && b.z > 0;
-    const ty = p.lock ? b.y : coming ? clamp(b.y, -0.05, 0.7) : 0.2;
-    p.y += (ty - p.y) * (1 - Math.exp(-dt * 16));
+    else if (g.phase === 'serveWait' && !human(g, g.server)) { g.timer -= dt; if (g.timer <= 0) startToss(g); }
+    const live = g.phase === 'rally' || g.phase === 'serve';
+    padHeight(p, b, live && g.hitter === 'r' && b.z > 0, dt);
+    if (pvp) padHeight(g.pad2, b, live && g.hitter === 'p' && b.z < 0, dt);
   }
 
-  const API = { _test: { point, resetForServe, afterPoint }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, setRng: (f) => { rng = f; } };
+  const API = { _test: { point, resetForServe, afterPoint, playerHit }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, setRng: (f) => { rng = f; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.PingPong = API;
 })(this);
