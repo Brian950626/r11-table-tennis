@@ -97,6 +97,7 @@ button { font: inherit; color: inherit; }
 .howto div { display: grid; grid-template-columns: 3.4em minmax(0, 1fr); gap: 8px; }
 .howto dt { font-weight: 700; color: var(--accent); }
 .howto dd { margin: 0; }
+.c-top, .tip .c-top { color: #ff6b78; } .c-back, .tip .c-back { color: #6fe9ff; } .c-side, .tip .c-side { color: #e59bff; }
 .rules { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 .primary { font-weight: 900; font-size: 17px; letter-spacing: 0.08em; padding: 13px; border-radius: 10px; border: 0; background: var(--accent); color: var(--accent-fg); box-shadow: 0 4px 0 var(--accent-deep); cursor: pointer; }
 .primary:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent-deep); }
@@ -222,8 +223,10 @@ button { font: inherit; color: inherit; }
       <dl class="howto">
         <div><dt>移動</dt><dd>手機在畫面上任意處拖曳；電腦移動滑鼠，或用方向鍵／WASD。</dd></div>
         <div><dt>方向</dt><dd>擊球瞬間往左或往右移動，球就往那邊飛；動太大會出界。</dd></div>
-        <div><dt>扣殺</dt><dd>擊球瞬間往前推。球要彈得夠高再扣，低球容易掛網。</dd></div>
-        <div><dt>放短</dt><dd>擊球瞬間往後拉，球會落在網前。</dd></div>
+        <div><dt>扣殺</dt><dd>擊球瞬間用力往前推。球要彈得夠高再扣，低球容易掛網。</dd></div>
+        <div><dt>放短</dt><dd>擊球瞬間用力往後拉，球會落在網前。</dd></div>
+        <div><dt>旋轉</dt><dd>擊球瞬間輕推＝上旋、輕拉＝下旋、快速左右揮＝側旋（球會往那邊彎）。</dd></div>
+        <div><dt>接旋轉</dt><dd>看球的顏色：<b class="c-top">紅</b>是上旋，回球容易出界，輕拉化解；<b class="c-back">青</b>是下旋，容易掛網，輕推化解；<b class="c-side">紫</b>是側旋，回球會往旁邊偏。</dd></div>
         <div><dt>發球</dt><dd>左右移動瞄準，站得離桌越遠發得越長；按「發球」或空白鍵。</dd></div>
       </dl>
       <p class="rules">先拿 11 分且領先 2 分獲勝。每 2 分換發球，10:10 之後每分換。發球要先在自己這邊彈一次再過網，擦網落在對面就重發。</p>
@@ -544,12 +547,45 @@ button { font: inherit; color: inherit; }
     groundEllipse(ctx, b.x, sy, b.z, 0.026 * (1 + h * 0.9));
     ctx.fillStyle = `rgba(0,0,0,${(0.5 * Math.max(0.18, 1 - h / 1.4)).toFixed(3)})`; ctx.fill();
   }
+  // 旋轉的顏色：上旋紅、下旋青、側旋紫（球的外圈、花紋和軌跡都用這個顏色）
+  const SPIN_COL = { top: '255,77,94', back: '111,233,255', side: '229,155,255' };
+  let spinPhase = 0, spinLast = 0;
+  function ballSpin(b) {
+    const t = b.spinTop || 0, s = b.spinSide || 0, m = Math.hypot(t, s);
+    return m < 0.12 ? null : { t, s, m, col: SPIN_COL[Math.abs(s) >= Math.abs(t) ? 'side' : t > 0 ? 'top' : 'back'] };
+  }
+  // 球上的花紋：幾條經線順著旋轉方向滑過去；減少動態時只畫一條不動的色帶
+  function drawSpinMarks(P, rad, sp, b, now) {
+    const dts = Math.min(0.05, Math.max(0, (now - spinLast) / 1000)); spinLast = now;
+    const away = b.vz < 0 ? 1 : -1; // 球往遠處飛時，上旋讓朝鏡頭那面往上轉
+    ctx.save();
+    ctx.strokeStyle = `rgb(${sp.col})`; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(P.x, P.y, rad + 0.9, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(P.x, P.y, rad, 0, Math.PI * 2); ctx.clip();
+    ctx.translate(P.x, P.y); ctx.rotate(Math.atan2(-sp.t * away, -sp.s * away));
+    ctx.lineWidth = Math.max(1, rad * 0.34);
+    if (reduced) {
+      ctx.beginPath(); ctx.moveTo(0, -rad); ctx.lineTo(0, rad); ctx.stroke();
+    } else {
+      spinPhase = (spinPhase + dts * (7 + 17 * Math.min(1, sp.m))) % (Math.PI * 2);
+      for (let k = 0; k < 3; k++) {
+        const ph = spinPhase + (k * 2 * Math.PI) / 3, c = Math.cos(ph), sn = Math.sin(ph);
+        if (c <= 0.05) continue;
+        ctx.globalAlpha = 0.35 + 0.65 * c;
+        ctx.beginPath();
+        if (sn >= 0) ctx.ellipse(0, 0, rad * sn + 0.01, rad, 0, -Math.PI / 2, Math.PI / 2);
+        else ctx.ellipse(0, 0, -rad * sn + 0.01, rad, 0, Math.PI / 2, (3 * Math.PI) / 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
   function drawBall(now) {
-    const b = game.ball;
+    const b = game.ball, sp = ballSpin(b);
     if (trail.length > 1) {
       for (let k = 1; k < trail.length; k++) {
         const p0 = proj(trail[k - 1][0], trail[k - 1][1], trail[k - 1][2]), p1 = proj(trail[k][0], trail[k][1], trail[k][2]);
-        ctx.strokeStyle = `rgba(255,250,235,${(0.05 + 0.3 * (k / trail.length)).toFixed(3)})`;
+        ctx.strokeStyle = sp ? `rgba(${sp.col},${(0.12 + 0.5 * (k / trail.length)).toFixed(3)})` : `rgba(255,250,235,${(0.05 + 0.3 * (k / trail.length)).toFixed(3)})`;
         ctx.lineWidth = Math.max(1, 0.04 * p1.s * (k / trail.length)); ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
       }
@@ -564,6 +600,7 @@ button { font: inherit; color: inherit; }
     const g = ctx.createRadialGradient(P.x - rad * 0.35, P.y - rad * 0.4, rad * 0.1, P.x, P.y, rad);
     g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#ddd5c6');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(P.x, P.y, rad, 0, Math.PI * 2); ctx.fill();
+    if (sp) drawSpinMarks(P, rad, sp, b, now);
   }
   function drawNetLayer(now) {
     const wob = netFlash > 0 && !reduced ? Math.sin(now / 18) * 1.6 * netFlash : 0;
@@ -783,7 +820,9 @@ button { font: inherit; color: inherit; }
         ? (lastPointer === 'mouse' ? '左右移動<b>瞄準</b>，離桌越遠發越長；<b>點擊</b>或<b>空白鍵</b>發球' : '拖曳左右<b>瞄準</b>，往下拉離桌越遠發越長')
         : '';
     } else if (running && !paused && pointsPlayed < 5 && (game.phase === 'rally' || game.phase === 'serve')) {
-      html = '擊球瞬間<b>往前推＝扣殺</b>，<b>往後拉＝放短</b>，左右移動改變方向';
+      html = '擊球瞬間<b>輕推＝上旋</b>、<b>用力推＝扣殺</b>；<b>輕拉＝下旋</b>、<b>用力拉＝放短</b>；左右改方向，快速揮＝<b>側旋</b>';
+    } else if (running && !paused && pointsPlayed < 10 && (game.phase === 'rally' || game.phase === 'serve')) {
+      html = '球的顏色：<b class="c-top">紅＝上旋</b>，輕拉化解；<b class="c-back">青＝下旋</b>，輕推化解；<b class="c-side">紫＝側旋</b>';
     }
     if (html !== tipKey) { tipKey = html; $('tip').innerHTML = html; $('tip').hidden = !html; }
     const showServe = running && !paused && game.phase === 'serveWait' && game.server === 'p';
