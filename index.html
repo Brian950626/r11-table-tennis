@@ -198,7 +198,7 @@ button { font: inherit; color: inherit; }
 </head>
 <body>
 <div class="game" id="game">
-  <canvas id="cv" role="img" aria-label="桌球場：你在近端，機器人 R-11 在遠端"></canvas>
+  <canvas id="cv" role="img" aria-label="桌球場：你在近端，對手 R-11 在遠端"></canvas>
 
   <div class="hud">
     <span class="tag" id="diffTag">普通</span>
@@ -228,13 +228,13 @@ button { font: inherit; color: inherit; }
         <p class="kicker">TABLE TENNIS · 11 POINTS</p>
         <button class="rec-open" id="bRecords" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="8" width="3.6" height="7" rx="1"/><rect x="6.2" y="4" width="3.6" height="11" rx="1"/><rect x="11.4" y="1" width="3.6" height="14" rx="1"/></svg>成績</button>
       </div>
-      <h1 class="cpu-only">對手：機器人 <span class="num">R-11</span></h1>
+      <h1 class="cpu-only">對手：<span class="num">R-11</span></h1>
       <h1 class="pvp-only">雙人對戰</h1>
       <p class="lede cpu-only">一局 11 分。移動球拍接球，擊球那一下怎麼動，球就怎麼飛。</p>
       <p class="lede pvp-only">一局 11 分。兩個人在同一支手機或同一台電腦上對打，各自控制一支球拍。</p>
       <p class="label">模式</p>
       <div class="diffs modes" id="modes" role="group" aria-label="模式">
-        <button type="button" data-mode="cpu" aria-pressed="true"><b>對戰 R-11</b><small>一個人跟機器人打</small></button>
+        <button type="button" data-mode="cpu" aria-pressed="true"><b>對戰 R-11</b><small>一個人跟 R-11 打</small></button>
         <button type="button" data-mode="pvp" aria-pressed="false"><b>雙人對戰</b><small>兩個人用同一台裝置對打</small></button>
       </div>
       <p class="label"><span class="cpu-only">難度</span><span class="pvp-only">球速</span></p>
@@ -962,7 +962,7 @@ button { font: inherit; color: inherit; }
     $('stSmashL').textContent = pvp ? '玩家 1 擊球數' : '扣殺得分';
     $('stHitsL').textContent = pvp ? '玩家 2 擊球數' : '你的擊球數';
     $('bChange').textContent = pvp ? '換模式或球速' : '換難度或造型';
-    cv.setAttribute('aria-label', pvp ? '桌球場：雙人對戰，玩家 1 和玩家 2 各在球桌一端' : '桌球場：你在近端，機器人 R-11 在遠端');
+    cv.setAttribute('aria-label', pvp ? '桌球場：雙人對戰，玩家 1 和玩家 2 各在球桌一端' : '桌球場：你在近端，對手 R-11 在遠端');
   }
   let tipKey = '';
   function updateTip() {
