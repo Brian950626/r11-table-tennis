@@ -76,7 +76,7 @@ console.log('擊球手勢');
 const g = E.createGame('normal', { rng: () => 0.5 });
 function hitWith(vz, vx, incoming) {
   g.phase = 'rally'; g.hitter = 'r'; g.recvBounced = true;
-  Object.assign(g.ball, { x: 0, y: 0.25, z: 1.6, vx: 0, vy: -0.5, vz: 4, spinTop: incoming ? incoming.top : 0, spinSide: incoming ? incoming.side : 0 });
+  Object.assign(g.ball, { x: 0, y: 0.25, z: 1.6, vx: 0, vy: -1.5, vz: 4, spinTop: incoming ? incoming.top : 0, spinSide: incoming ? incoming.side : 0 });
   Object.assign(g.pad, { x: 0, z: 1.6, vz, vx, hist: [] });
   E._test.playerHit(g);
   return { type: g.lastShot.p, top: g.ball.spinTop, side: g.ball.spinSide, vy: g.ball.vy, vx: g.ball.vx, speed: Math.hypot(g.ball.vx, g.ball.vz) };
@@ -98,7 +98,7 @@ ok(pFast.speed > pSlow.speed + 0.3 && pSmash.speed > pFast.speed && pSmashMax.sp
 function hitWith2(vz, vx) {
   const x = E.createGame('normal', { rng: () => 0.5, mode: 'pvp' });
   x.phase = 'rally'; x.hitter = 'p'; x.recvBounced = true;
-  Object.assign(x.ball, { x: 0, y: 0.25, z: -1.6, vx: 0, vy: -0.5, vz: -4, spinTop: 0, spinSide: 0 });
+  Object.assign(x.ball, { x: 0, y: 0.25, z: -1.6, vx: 0, vy: -1.5, vz: -4, spinTop: 0, spinSide: 0 });
   Object.assign(x.pad2, { x: 0, z: -1.6, vz, vx, hist: [] });
   E._test.playerHit(x, 'r');
   return { type: x.lastShot.r, top: x.ball.spinTop, side: x.ball.spinSide, land: E.predictBounce(x, 'p') };
@@ -111,7 +111,7 @@ console.log('引拍（擊球前的揮拍路徑）');
 // 拍子的路徑：從 (x0, z0) 拉到 (x0, z0 + back)，再往前揮到擊球點 (x0 + lat, z0)；擊球者是玩家 1
 function hitWithSwing(back, lat, push) {
   g.phase = 'rally'; g.hitter = 'r'; g.recvBounced = true;
-  Object.assign(g.ball, { x: lat, y: 0.25, z: 1.6, vx: 0, vy: -0.5, vz: 4, spinTop: 0, spinSide: 0 });
+  Object.assign(g.ball, { x: lat, y: 0.25, z: 1.6, vx: 0, vy: -1.5, vz: 4, spinTop: 0, spinSide: 0 });
   const t0 = g.time, path = [];
   for (let i = 0; i <= 6; i++) path.push({ x: 0, z: 1.6 + (back * i) / 6, t: t0 - 0.38 + i * 0.03 }); // 往後拉
   for (let i = 1; i <= 8; i++) path.push({ x: (lat * i) / 8, z: 1.6 + back - (back * i) / 8, t: t0 - 0.2 + i * 0.025 }); // 往前揮
@@ -136,7 +136,7 @@ console.log('打在球的哪一側');
 // 球在拍子中心右邊 dx 公尺（負的是左邊）被打到：球偏右＝拍子摩擦到球的左側，偏左＝摩擦到球的右側
 function hitOff(dx, vz, vx) {
   g.phase = 'rally'; g.hitter = 'r'; g.recvBounced = true;
-  Object.assign(g.ball, { x: dx, y: 0.25, z: 1.6, vx: 0, vy: -0.5, vz: 4, spinTop: 0, spinSide: 0 });
+  Object.assign(g.ball, { x: dx, y: 0.25, z: 1.6, vx: 0, vy: -1.5, vz: 4, spinTop: 0, spinSide: 0 });
   Object.assign(g.pad, { x: 0, z: 1.6, vz, vx, hist: [] });
   E._test.playerHit(g);
   return { type: g.lastShot.p, top: g.ball.spinTop, side: g.ball.spinSide };
@@ -156,7 +156,7 @@ ok(oChop.type === 'chop' && oChop.top < -0.4 && oChop.side > 0.3, `往後拉（�
 // 玩家 2 的左右是反的：球在 -x 那邊＝在他的拍子右邊
 const x2 = E.createGame('normal', { rng: () => 0.5, mode: 'pvp' });
 x2.phase = 'rally'; x2.hitter = 'p'; x2.recvBounced = true;
-Object.assign(x2.ball, { x: -0.8 * RR, y: 0.25, z: -1.6, vx: 0, vy: -0.5, vz: -4, spinTop: 0, spinSide: 0 });
+Object.assign(x2.ball, { x: -0.8 * RR, y: 0.25, z: -1.6, vx: 0, vy: -1.5, vz: -4, spinTop: 0, spinSide: 0 });
 Object.assign(x2.pad2, { x: 0, z: -1.6, vz: 0.7, vx: 0, hist: [] });
 E._test.playerHit(x2, 'r');
 ok(x2.ball.spinSide < -0.3, `雙人模式玩家 2 打在球的左側（球在他的拍子右邊）→ 球往他的右手邊（-x）彎（${f2(x2.ball.spinSide)}）`);
@@ -165,7 +165,7 @@ console.log('擦邊（球打在拍子邊緣）');
 // 球在拍子右邊 dx 公尺的地方被打到，其他條件跟 hitWith(0, 0) 一樣
 function hitAt(dx) {
   g.phase = 'rally'; g.hitter = 'r'; g.recvBounced = true; g.events.length = 0;
-  Object.assign(g.ball, { x: dx, y: 0.25, z: 1.6, vx: 0, vy: -0.5, vz: 4, spinTop: 0, spinSide: 0 });
+  Object.assign(g.ball, { x: dx, y: 0.25, z: 1.6, vx: 0, vy: -1.5, vz: 4, spinTop: 0, spinSide: 0 });
   Object.assign(g.pad, { x: 0, z: 1.6, vz: -0.7, vx: 0, hist: [] });
   E._test.playerHit(g);
   const e = g.events.find((x) => x.kind === 'hit');
@@ -189,6 +189,73 @@ function passBy(dx) {
 ok(passBy(R * 0.95) && passBy(R + W * 0.8), '球從拍子範圍內，或範圍外面一小圈經過，都算打到');
 ok(!passBy(R + W + 0.02), '再外面就打不到了');
 
+console.log('擊球時機');
+// 球以往上速度 vy 經過拍子時被打到（vy 大＝才剛彈起來，負的＝已經往下掉）；incoming 是來球的旋轉
+function hitTimed(vy, opt) {
+  opt = opt || {};
+  const x = E.createGame(opt.diff || 'normal', { rng: opt.rng || (() => 0.5) });
+  x.phase = 'rally'; x.hitter = 'r'; x.recvBounced = true;
+  Object.assign(x.ball, { x: opt.dx || 0, y: opt.y || 0.25, z: 1.6, vx: 0, vy, vz: opt.vz || 4, spinTop: opt.top || 0, spinSide: opt.side || 0 });
+  Object.assign(x.pad, { x: 0, z: 1.6, vz: opt.pvz === undefined ? -0.7 : opt.pvz, vx: 0, hist: [] });
+  E._test.playerHit(x);
+  const e = x.events.find((q) => q.kind === 'hit');
+  return { e, g: x, land: E.predictBounce(x, 'r'), speed: Math.hypot(x.ball.vx, x.ball.vz), vy: x.ball.vy, vx: x.ball.vx };
+}
+const lead = E.SPINFX.sweetLead * E.G; // 最佳擊球點的往上速度（沒有旋轉時）
+const tP = hitTimed(lead), tEarly = hitTimed(lead + 1.5), tLate = hitTimed(lead - 1.5);
+ok(tP.e.perfect && tP.e.timing === 'perfect' && tP.g.perfects.p === 1, '球快到最高點時打到 → 完美');
+ok(!tEarly.e.perfect && tEarly.e.timing === 'early', '球才剛彈起來就打 → 太早');
+ok(!tLate.e.perfect && tLate.e.timing === 'late' && tLate.g.perfects.p === 0, '球已經往下掉才打 → 太晚');
+const wN = E.DIFFS.normal.perfect * E.G, inN = hitTimed(lead + wN * 0.9), outN = hitTimed(lead + wN * 1.1);
+ok(inN.e.perfect && !outN.e.perfect, `普通難度：離最佳擊球點 ${E.DIFFS.normal.perfect} 秒以內才算完美`);
+ok(E.DIFFS.easy.perfect > E.DIFFS.normal.perfect && E.DIFFS.normal.perfect > E.DIFFS.hard.perfect, '難度越高，完美時機越窄');
+ok(hitTimed(lead + wN * 1.3, { diff: 'easy' }).e.perfect && !hitTimed(lead + wN * 0.9, { diff: 'hard' }).e.perfect, '同一個時機：簡單算完美，困難不算');
+ok(tP.speed > tLate.speed, `完美時機的球比較快（${f2(tLate.speed)} → ${f2(tP.speed)} m/s）`);
+// 亂數很偏、打在拍子邊邊、來球帶強旋轉：完美時機還是打在桌上
+let allIn = true, someOut = false;
+for (const r of [0.02, 0.2, 0.5, 0.8, 0.98]) for (const dx of [-0.16, 0, 0.16]) {
+  const a = hitTimed(lead, { rng: () => r, dx, top: 0.9, side: 0.8 }), z = hitTimed(lead - 1.5, { rng: () => r, dx, top: 0.9, side: 0.8 });
+  if (!a.land) allIn = false;
+  if (!z.land) someOut = true;
+}
+ok(allIn, '完美時機：不管亂數、打在拍子哪裡、來球多轉，回球都落在對面桌上');
+ok(someOut, '同樣的球太晚打，有些會出界或掛網');
+const kP = hitTimed(lead, { pvz: 0, top: 0.6 }), kL = hitTimed(lead - 1.5, { pvz: 0, top: 0.6 }), k0 = hitTimed(lead - 1.5, { pvz: 0 });
+ok(kL.vy > k0.vy + 0.2 && Math.abs(kP.vy - hitTimed(lead, { pvz: 0 }).vy) < 1e-9, '完美時機完全化解來球的旋轉；太晚打，上旋還是讓回球往上飄');
+const eP = hitTimed(lead, { dx: E.DIFFS.normal.pReach + 0.02 });
+ok(eP.e.type === 'edge' && !eP.e.perfect, '擦邊的球就算時機對，也不算完美');
+// R-11 接完美時機的球比較容易失誤
+function robotErrs(perfect) {
+  let n = 0, seed = 11; const rng = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const x = E.createGame('normal', { rng });
+  for (let i = 0; i < 3000; i++) {
+    x.phase = 'rally'; x.hitter = 'p'; x.recvBounced = true; x.lastPerfect = perfect; x.lastShot.p = 'drive';
+    Object.assign(x.ball, { x: 0, y: 0.25, z: -1.6, vx: 0, vy: -0.5, vz: -4, spinTop: 0, spinSide: 0 }); x.robot.x = 0;
+    E._test.robotHit(x); if (x.lastShot.r === 'error') n++;
+  }
+  return n / 3000;
+}
+const rE0 = robotErrs(false), rE1 = robotErrs(true);
+ok(rE1 > rE0 + 0.01, `R-11 接完美時機的球比較容易失誤（${(rE0 * 100).toFixed(1)}% → ${(rE1 * 100).toFixed(1)}%）`);
+// 最佳擊球點的預測：球真的飛到那裡時，時機剛好是完美的正中間
+const gs = E.createGame('normal', { rng: () => 0.5 });
+gs.phase = 'rally'; gs.hitter = 'p'; gs.recvBounced = true;
+Object.assign(gs.ball, { x: 0, y: 0.25, z: -1.6, vx: 0, vy: -0.5, vz: -4, spinTop: 0, spinSide: 0 });
+E._test.robotHit(gs);
+const sw2 = gs.sweet, fly = Object.assign({}, gs.ball), evs = [];
+let tauAt = null;
+for (let i = 0; i < 4000 && tauAt === null; i++) { E.stepBall(fly, 1 / 2000, evs); if (fly.z >= sw2.z) tauAt = E.timingOf(gs, fly).tau; }
+ok(sw2 && sw2.z > 0.9 && sw2.y > 0.05 && Math.abs(tauAt) < 0.01, `準星標的位置就是最佳擊球點（z ${f2(sw2.z)}、高 ${f2(sw2.y)} m，誤差 ${Math.abs(tauAt).toFixed(3)} 秒）`);
+
+console.log('擋球');
+const bFast = hitTimed(-1.5, { pvz: 0, vz: 7 }), bSlow = hitTimed(-1.5, { pvz: 0, vz: 4 }), bMove = hitTimed(-1.5, { pvz: -0.7, vz: 7 });
+ok(bFast.e.type === 'block', '拍子不動、來球很快 → 擋球');
+ok(bSlow.e.type === 'drive' && bMove.e.type !== 'block', '來球不快是平擊；拍子有在動就不是擋球');
+const bSpin = hitTimed(-1.5, { pvz: 0, vz: 7, top: 0.6 }), bNo = hitTimed(-1.5, { pvz: 0, vz: 7 });
+const dBlock = bSpin.vy - bNo.vy, dDrive = kL.vy - k0.vy;
+ok(dBlock > 0.05 && dBlock < dDrive * 0.6, `擋球把來球的旋轉卸掉一半（上飄 ${f2(dDrive)} → ${f2(dBlock)} m/s）`);
+ok(hitTimed(-1.5, { pvz: 0, vz: 9 }).speed > bFast.speed, '來球越快，擋回去的球也越快（借力）');
+
 console.log('接旋轉球');
 const inBack = { top: -0.5, side: 0 }, inTop = { top: 0.5, side: 0 }, inSide = { top: 0, side: 0.6 };
 const rFlatBack = hitWith(0, 0, inBack), rLoopBack = hitWith(-0.7, 0, inBack), rFlatTop = hitWith(0, 0, inTop), rChopTop = hitWith(0.55, 0, inTop);
@@ -203,7 +270,7 @@ ok(k.vy < 0 && k.vx === 0, '只抵消一部分時，剩下的旋轉還是有影�
 console.log('R-11');
 const gr = E.createGame('hard', { rng: () => 0.04 }); // 亂數固定 0.04：比失誤率 0.03 高、比旋轉機率低，一定打旋轉球
 gr.phase = 'rally'; gr.hitter = 'p'; gr.recvBounced = true; gr.pad.x = 0.5; gr.pad.z = 1.4;
-Object.assign(gr.ball, { x: 0, y: 0.25, z: -1.6, vx: 0, vy: -0.5, vz: -4, spinTop: 0, spinSide: 0 });
+Object.assign(gr.ball, { x: 0, y: 0.25, z: -1.6, vx: 0, vy: -1.5, vz: -4, spinTop: 0, spinSide: 0 });
 E._test.robotHit(gr);
 ok(Math.abs(gr.ball.spinTop) + Math.abs(gr.ball.spinSide) > 0.3, `困難的 R-11 會打旋轉球（這球是 ${gr.lastShot.r}，旋轉 ${f2(gr.ball.spinTop)}／${f2(gr.ball.spinSide)}）`);
 ok(E.DIFFS.easy.spin < E.DIFFS.normal.spin && E.DIFFS.normal.spin < E.DIFFS.hard.spin, '難度越高，R-11 越常打旋轉球（DIFFS.spin）');

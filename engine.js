@@ -16,6 +16,10 @@
     fricTop: 0.26, fricBack: 0.4,
     minKeep: 0.2, // 下旋再強，落台後往前的速度至少剩這個比例（球不會倒著跑回去）
     contactSide: 0.9, // 打在球的側面（球偏離拍子中心）時最多帶出多少側旋
+    blockIn: 6, blockPad: 0.3, // 擋球：來球比 blockIn 快（m/s），而且拍子幾乎沒動（比 blockPad 慢）
+    sweetLead: 0.09, // 最佳擊球點在最高點之前幾秒（遊戲時間）：球快到最高點、還在上升的時候
+    perfectFast: 0.95, // 完美時機的回球飛行時間乘這個倍數（球比較快）
+    perfectErr: 0.12, // R-11 接完美時機的球，多出的失誤（乘 rErrK）
     keepTop: 0.5, keepSide: 0.7, // 落台後剩下的旋轉比例
     recvY: 0.6, recvX: 0.45, recvSig: 0.03, // 接球時沒化解掉的來球旋轉讓回球偏掉多少
     smashTop: 1, // 扣殺帶的上旋
@@ -27,11 +31,12 @@
   const PAD = { xMin: -1.05, xMax: 1.05, zMin: 0.9, zMax: 2.05, restZ: 1.62 };
   const ROB = { zRest: -1.62, zDeep: -1.85, xMax: 1.0 };
 
+  // perfect：完美時機的寬度（球離最高點前後幾秒內打到都算，遊戲時間）；sweet：要不要在畫面上標出最佳擊球點
   // spin：R-11 一般回球帶旋轉的機率；spinMax：它打出的最強旋轉；rSpinErr：接到旋轉球時多出的失誤率
   const DIFFS = {
-    easy: { key: 'easy', name: '簡單', ts: 0.47, pReach: 0.2, rReach: 0.15, rSpeed: 1.45, rZ: 0.8, rReact: 0.24, rNoise: 0.07, rErr: 0.12, rErrK: 0.26, rTf: [0.56, 0.64], spread: 0.3, corner: 0, smash: 0.03, drop: 0, rZmin: -1.0, spin: 0.08, spinMax: 0.5, rSpinErr: 0.3, hint: true },
-    normal: { key: 'normal', name: '普通', ts: 0.55, pReach: 0.17, rReach: 0.16, rSpeed: 2.0, rZ: 0.75, rReact: 0.16, rNoise: 0.035, rErr: 0.06, rErrK: 0.2, rTf: [0.46, 0.54], spread: 0.45, corner: 0.4, smash: 0.25, drop: 0.06, rZmin: -0.95, spin: 0.3, spinMax: 0.75, rSpinErr: 0.2, hint: false },
-    hard: { key: 'hard', name: '困難', ts: 0.63, pReach: 0.155, rReach: 0.17, rSpeed: 2.7, rZ: 0.7, rReact: 0.1, rNoise: 0.015, rErr: 0.03, rErrK: 0.14, rTf: [0.38, 0.46], spread: 0.6, corner: 0.8, smash: 0.55, drop: 0.12, rZmin: -0.9, spin: 0.55, spinMax: 1.0, rSpinErr: 0.12, hint: false },
+    easy: { key: 'easy', name: '簡單', ts: 0.47, pReach: 0.2, rReach: 0.15, rSpeed: 1.45, rZ: 0.8, rReact: 0.24, rNoise: 0.07, rErr: 0.12, rErrK: 0.26, rTf: [0.56, 0.64], spread: 0.3, corner: 0, smash: 0.03, drop: 0, rZmin: -1.0, spin: 0.08, spinMax: 0.5, rSpinErr: 0.3, hint: true, perfect: 0.075, sweet: true },
+    normal: { key: 'normal', name: '普通', ts: 0.55, pReach: 0.17, rReach: 0.16, rSpeed: 2.0, rZ: 0.75, rReact: 0.16, rNoise: 0.035, rErr: 0.06, rErrK: 0.2, rTf: [0.46, 0.54], spread: 0.45, corner: 0.4, smash: 0.25, drop: 0.06, rZmin: -0.95, spin: 0.3, spinMax: 0.75, rSpinErr: 0.2, hint: false, perfect: 0.05, sweet: true },
+    hard: { key: 'hard', name: '困難', ts: 0.63, pReach: 0.155, rReach: 0.17, rSpeed: 2.7, rZ: 0.7, rReact: 0.1, rNoise: 0.015, rErr: 0.03, rErrK: 0.14, rTf: [0.38, 0.46], spread: 0.6, corner: 0.8, smash: 0.55, drop: 0.12, rZmin: -0.9, spin: 0.55, spinMax: 1.0, rSpinErr: 0.12, hint: false, perfect: 0.035, sweet: false },
   };
 
   // 打法個性：每個造型一種（skins.js 的 style），疊在難度上，只改 R-11 回球和發球的選擇。
@@ -208,7 +213,7 @@
       robot: { x: 0, y: 0.2, z: ROB.zRest, plan: null, react: 0, noise: 0, lock: false, swing: 0, mood: 'idle', moodT: 0, tossHand: 0 },
       // 雙人模式玩家 2 的球拍：世界座標，在遠端（z < 0），可動範圍是 PAD 前後翻過來
       pad2: { x: 0, y: 0.2, z: -PAD.restZ, vx: 0, vz: 0, tx: 0, tz: -PAD.restZ, lock: false, swing: 0 },
-      rallyHits: 0, longest: 0, smashWins: 0, totalHits: { p: 0, r: 0 },
+      rallyHits: 0, longest: 0, smashWins: 0, totalHits: { p: 0, r: 0 }, perfects: { p: 0, r: 0 }, lastPerfect: false,
       aim: { x: 0, z: -0.8 }, serveData: null, lastShot: { p: 'drive', r: 'drive' },
       hint: null, winner: null, events: [], time: 0,
     };
@@ -227,7 +232,7 @@
     g.server = sp >= 10 && sr >= 10 ? (n % 2 === 0 ? g.first : other) : Math.floor(n / 2) % 2 === 0 ? g.first : other;
     g.phase = 'serveWait'; g.timer = human(g, g.server) ? 0 : 1.1;
     g.hitter = g.server; g.serveOwn = false; g.recvBounced = false; g.netTouched = false; g.netHit = false;
-    g.rallyHits = 0; g.pad.lock = false; g.robot.lock = false; g.robot.plan = null; g.hint = null; g.serveData = null;
+    g.rallyHits = 0; g.pad.lock = false; g.robot.lock = false; g.robot.plan = null; g.hint = null; g.sweet = null; g.serveData = null;
     g.pad2.lock = false;
     const b = g.ball; b.vx = b.vy = b.vz = 0; setSpin(b, 0, 0);
     holdBall(g);
@@ -283,9 +288,9 @@
     g.phase = 'serve'; g.hitter = S; g.serveOwn = false; g.recvBounced = false; g.netTouched = false; g.netHit = false;
     g.rallyHits = 1; g.totalHits[S]++;
     g.lastShot[S] = 'serve';
-    if (g.mode === 'pvp') { const p = padOf(g, S); p.swing = 1; p.lock = false; g.hint = predictBounce(g, otherSide(S)); }
+    if (g.mode === 'pvp') { const p = padOf(g, S); p.swing = 1; p.lock = false; g.hint = predictBounce(g, otherSide(S)); g.sweet = predictSweet(g, otherSide(S)); }
     else if (S === 'p') { g.pad.swing = 1; g.pad.lock = false; planRobot(g); }
-    else { g.robot.swing = 1; g.robot.lock = false; g.hint = predictBounce(g, 'p'); }
+    else { g.robot.swing = 1; g.robot.lock = false; g.hint = predictBounce(g, 'p'); g.sweet = predictSweet(g, 'p'); }
     g.events.push({ kind: 'hit', who: S, type: 'serve', x: b.x });
   }
 
@@ -294,7 +299,7 @@
     g.score[winner]++;
     g.longest = Math.max(g.longest, g.rallyHits);
     if (winner === 'p' && g.hitter === 'p' && g.lastShot.p === 'smash') g.smashWins++;
-    g.phase = 'dead'; g.timer = 1.55; g.robot.plan = null; g.hint = null;
+    g.phase = 'dead'; g.timer = 1.55; g.robot.plan = null; g.hint = null; g.sweet = null;
     g.robot.mood = winner === 'r' ? 'happy' : 'sad'; g.robot.moodT = 1.9;
     const sp = g.score.p, sr = g.score.r;
     const over = (sp >= 11 || sr >= 11) && Math.abs(sp - sr) >= 2;
@@ -304,7 +309,7 @@
 
   function letServe(g) {
     if (g.phase === 'dead') return;
-    g.phase = 'dead'; g.timer = 1.3; g.robot.plan = null; g.hint = null; g.isLet = true;
+    g.phase = 'dead'; g.timer = 1.3; g.robot.plan = null; g.hint = null; g.sweet = null; g.isLet = true;
     g.events.push({ kind: 'let' });
   }
 
@@ -373,12 +378,20 @@
     return dx <= R ? 0 : 0.35 + 0.65 * clamp((dx - R) / SPINFX.edgeW, 0, 1);
   }
 
+  // 擊球時機：球落台彈起後，快到最高點、還在上升的時候（最佳擊球點）打到就是「完美」。
+  // tau 是離最佳擊球點的時間（秒，遊戲時間）：負的是太早（球才剛彈起來），正的是太晚（球已經過了最高點往下掉）
+  function timingOf(g, b) {
+    const tau = -b.vy / spinAccel(b.spinTop || 0, 0).gy + SPINFX.sweetLead, w = g.diff.perfect || 0.065;
+    return { tau, grade: Math.abs(tau) <= w ? 'perfect' : tau < 0 ? 'early' : 'late' };
+  }
+
   function playerHit(g, who) {
     who = who === 'r' ? 'r' : 'p';
     const s = who === 'r' ? -1 : 1, b = g.ball, p = padOf(g, who), d = g.diff;
     const off = clamp((s * (b.x - p.x)) / d.pReach, -1, 1), edge = edgeOf(g, p, b);
     const push = -s * p.vz, side = s * p.vx;
     const inc = { top: b.spinTop || 0, side: b.spinSide || 0 }; // 來球的旋轉（側旋是世界座標）
+    const tm = timingOf(g, b), perfect = tm.grade === 'perfect' && edge === 0;
     let type = 'drive', Tf, zt, top = 0;
     let sig = 0.05 + 0.11 * off * off + SPINFX.recvSig * (Math.abs(inc.top) + Math.abs(inc.side));
     if (push > 1.0) {
@@ -393,6 +406,10 @@
     } else if (push < -0.3) { // 輕拉：下旋長球
       type = 'chop'; top = -(0.45 + 0.45 * clamp((-push - 0.3) / 0.5, 0, 1));
       Tf = 0.54; zt = -0.7 - 0.38 * rng();
+    } else if (Math.hypot(push, side) < SPINFX.blockPad && Math.hypot(b.vx, b.vz) >= SPINFX.blockIn) {
+      // 擋球：拍子不動去擋快球，借來球的力量回去；球比較短、比較穩，來球的旋轉也卸掉一半
+      type = 'block'; Tf = clamp(0.52 - 0.025 * (Math.hypot(b.vx, b.vz) - SPINFX.blockIn), 0.42, 0.52);
+      zt = -0.62 - 0.34 * rng(); sig *= 0.7;
     } else {
       Tf = 0.5 - 0.1 * clamp(push, 0, 1); zt = -0.72 - 0.4 * rng();
     }
@@ -414,12 +431,14 @@
     const contact = SPINFX.contactSide * offC * clamp(Math.hypot(push, side) / 1.2, 0, 1);
     const w = { top, side: s * clamp(swipe + loopSide + contact, -1, 1) };
     if (d.key === 'easy') sig *= 0.6;
+    if (perfect) { sig = 0; Tf *= SPINFX.perfectFast; } // 完美時機：落點不會偏、球比較快
     let xt = 0.42 * off + 0.24 * side + gauss() * sig;
     xt = d.key === 'easy' ? clamp(xt, -0.72, 0.72) : clamp(xt, -1.3, 1.3);
     zt += gauss() * sig * 0.6;
+    if (perfect) { xt = clamp(xt, -(HX - 0.1), HX - 0.1); zt = clamp(zt, -(HZ - 0.12), -0.25); } // 一定打在桌上
     xt *= s; zt *= s;
     let v = aimVelocity(b, xt, zt, Tf, w);
-    if (type !== 'smash' || b.y > 0.16) {
+    if (type !== 'smash' || b.y > 0.16 || perfect) {
       for (let n = 0; n < 14 && netMargin(b, v, w) < 0.02; n++) { Tf += 0.03; v = aimVelocity(b, xt, zt, Tf, w); }
     }
     if (edge > 0) {
@@ -432,12 +451,15 @@
       w.side = w.side * (1 - 0.75 * edge) + out * 0.3 * edge;
       type = 'edge';
     }
-    const kick = receiveKick(inc, w);
-    v.vx += kick.vx; v.vy += kick.vy;
+    // 來球的旋轉讓回球偏掉：完美時機完全化解，擋球卸掉一半
+    const kick = receiveKick(inc, w), kk = perfect ? 0 : type === 'block' ? 0.5 : 1;
+    v.vx += kick.vx * kk; v.vy += kick.vy * kk;
+    if (perfect) g.perfects[who]++;
+    g.lastPerfect = perfect;
     g.hitter = who; g.lastShot[who] = type; g.totalHits[who]++; p.swing = 1;
     launch(g, v, w);
-    g.events.push({ kind: 'hit', who, type, x: b.x, speed: Math.hypot(v.vx, v.vz), spin: b.spin, spinTop: b.spinTop, spinSide: b.spinSide, edge });
-    if (g.mode === 'pvp') g.hint = predictBounce(g, otherSide(who));
+    g.events.push({ kind: 'hit', who, type, x: b.x, speed: Math.hypot(v.vx, v.vz), spin: b.spin, spinTop: b.spinTop, spinSide: b.spinSide, edge, timing: tm.grade, perfect });
+    if (g.mode === 'pvp') { g.hint = predictBounce(g, otherSide(who)); g.sweet = predictSweet(g, otherSide(who)); }
     else planRobot(g);
   }
 
@@ -445,7 +467,7 @@
     const b = g.ball, r = g.robot, d = g.diff, p = g.pad;
     const off = clamp(Math.abs(b.x - r.x) / d.rReach, 0, 1);
     const inc = g.lastShot.p, spinIn = Math.abs(b.spinTop || 0) + Math.abs(b.spinSide || 0);
-    const errP = d.rErr + d.rErrK * (0.7 * off * off + (inc === 'smash' ? 0.7 : 0) + (inc === 'drop' ? 0.45 : 0)) + d.rSpinErr * spinIn;
+    const errP = d.rErr + d.rErrK * (0.7 * off * off + (inc === 'smash' ? 0.7 : 0) + (inc === 'drop' ? 0.45 : 0) + (g.lastPerfect ? SPINFX.perfectErr : 0)) + d.rSpinErr * spinIn;
     let type = 'drive', v;
     const w = { top: 0, side: 0 };
     const awayX = () => -Math.sign(p.x || rng() - 0.5) * rand(0.35, 0.62);
@@ -478,7 +500,7 @@
     }
     g.hitter = 'r'; g.lastShot.r = type; g.totalHits.r++; r.swing = 1; r.plan = null;
     launch(g, v, w);
-    g.hint = predictBounce(g, 'p');
+    g.hint = predictBounce(g, 'p'); g.sweet = predictSweet(g, 'p');
     g.events.push({ kind: 'hit', who: 'r', type, x: b.x, speed: Math.hypot(v.vx, v.vz), spin: b.spin, spinTop: b.spinTop, spinSide: b.spinSide });
   }
 
@@ -506,6 +528,21 @@
         if (e.type === 'bounce' && e.side === side) return { x: e.x, z: e.z };
         if (e.type === 'floor' || e.type === 'far') return null;
       }
+    }
+    return null;
+  }
+
+  // 最佳擊球點：球在 side 那一邊落台彈起後，快到最高點的位置（在這附近打到就是完美時機）
+  function predictSweet(g, side) {
+    const s = Object.assign({}, g.ball), ev = [];
+    let bounced = false;
+    for (let t = 0; t < 3; t += 1 / 240) {
+      ev.length = 0; stepBall(s, 1 / 240, ev);
+      for (const e of ev) {
+        if (e.type === 'bounce' && e.side === side && !bounced) bounced = true;
+        else if (e.type !== 'netcord') return null;
+      }
+      if (bounced && s.vy <= SPINFX.sweetLead * spinAccel(s.spinTop || 0, 0).gy) return { x: s.x, y: s.y, z: s.z };
     }
     return null;
   }
@@ -610,6 +647,6 @@
     if (pvp) padHeight(g.pad2, b, live && g.hitter === 'p' && b.z < 0, dt);
   }
 
-  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit, checkHits, swingPath }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, spinAccel, receiveKick, setRng: (f) => { rng = f; } };
+  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit, checkHits, swingPath, timingOf }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, predictSweet, timingOf, spinAccel, receiveKick, setRng: (f) => { rng = f; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.PingPong = API;
 })(this);

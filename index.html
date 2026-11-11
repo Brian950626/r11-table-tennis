@@ -67,6 +67,8 @@ button { font: inherit; color: inherit; }
 .callout { position: absolute; left: 0; right: 0; top: 44%; text-align: center; pointer-events: none; font-weight: 900; font-size: 22px; letter-spacing: 0.06em; color: var(--fg); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }
 .callout.good { color: var(--accent); }
 .callout.bad { color: var(--coral); }
+.callout.shot { font-size: 15px; font-weight: 800; opacity: 0.86; }
+.callout.perfect { font-size: 26px; color: #ffe08a; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), 0 0 14px rgba(255, 196, 64, 0.75); }
 .callout.show { animation: rise 0.9s ease-out forwards; }
 @keyframes rise { 0% { transform: translateY(8px) scale(0.9); opacity: 0; } 15% { transform: none; opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(-14px); opacity: 0; } }
 
@@ -264,6 +266,8 @@ button { font: inherit; color: inherit; }
         <div><dt>方向</dt><dd>擊球瞬間往左或往右移動，球就往那邊飛；動太大會出界。</dd></div>
         <div><dt>扣殺</dt><dd>擊球瞬間用力往前推。球要彈得夠高再扣，低球容易掛網。</dd></div>
         <div><dt>放短</dt><dd>擊球瞬間用力往後拉，球會落在網前。</dd></div>
+        <div><dt>時機</dt><dd>球落台彈起來、快到最高點時打到＝<b>完美</b>：落點不會偏、球更快，來球的旋轉也不影響。簡單和普通會用準星標出最佳擊球點，往前或往後站去對準它；球外面出現亮圈時就是完美時機。</dd></div>
+        <div><dt>擋球</dt><dd>拍子不動去擋快球：借來球的力量回去，比較穩，來球的旋轉卸掉一半。</dd></div>
         <div><dt>旋轉</dt><dd>擊球瞬間輕推＝上旋，落到對面桌上會加速往前衝；輕拉＝下旋，落台後會變慢。往右揮＝右側旋、往左揮＝左側旋（球往揮的方向彎），揮得越快越強。推得越快，球也飛得越快。</dd></div>
         <div><dt>打側面</dt><dd>球偏在拍子右邊＝摩擦到球的左側，球往右彎；偏在左邊＝摩擦到球的右側，球往左彎。跟揮拍方向相反的那一側，側旋會反過來。</dd></div>
         <div><dt>拉球</dt><dd>擊球前先往後拉（引拍）再往前揮，上旋更強；引拍越長、揮得越快越強。從斜後方斜著往前揮＝側上旋，往後拉同時左右揮＝側下旋。</dd></div>
@@ -305,7 +309,7 @@ button { font: inherit; color: inherit; }
       <div class="stats">
         <div><b id="stLong">0</b><span>最長回合（拍）</span></div>
         <div><b id="stSmash">0</b><span id="stSmashL">扣殺得分</span></div>
-        <div><b id="stHits">0</b><span id="stHitsL">你的擊球數</span></div>
+        <div><b id="stHits">0</b><span id="stHitsL">完美擊球</span></div>
       </div>
       <p class="lede" id="endNote"></p>
       <p class="end-rec" id="endRec" hidden><span id="endRecText"></span><button class="rec-link" id="bEndRec" type="button">看成績</button></p>
@@ -724,6 +728,12 @@ button { font: inherit; color: inherit; }
       ctx.strokeStyle = `rgba(${toP2 ? '62,230,207' : '255,182,39'},${(0.45 + 0.4 * pulse).toFixed(3)})`; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(P.x, P.y, rad * (1.9 + 0.4 * pulse), 0, Math.PI * 2); ctx.stroke();
     }
+    // perfect timing: a bright halo while the ball is inside the window (about to reach the top of its bounce)
+    const toHuman = game.phase === 'rally' && (game.hitter === 'r' && b.z > 0 || toP2) && game.recvBounced;
+    if (toHuman && E.timingOf(game, b).grade === 'perfect') {
+      ctx.strokeStyle = toP2 ? 'rgba(190,255,246,0.95)' : 'rgba(255,236,170,0.95)'; ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.arc(P.x, P.y, rad * 1.45, 0, Math.PI * 2); ctx.stroke();
+    }
     const g = ctx.createRadialGradient(P.x - rad * 0.35, P.y - rad * 0.4, rad * 0.1, P.x, P.y, rad);
     g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#ddd5c6');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(P.x, P.y, rad, 0, Math.PI * 2); ctx.fill();
@@ -773,6 +783,18 @@ button { font: inherit; color: inherit; }
     if (g.diff.hint && g.hint && (g.hitter === 'r' || isPvp()) && !g.recvBounced && (g.phase === 'rally' || g.phase === 'serve')) {
       ctx.setLineDash([4, 4]); ctx.strokeStyle = isPvp() && g.hitter === 'p' ? 'rgba(62,230,207,0.85)' : 'rgba(255,182,39,0.85)'; ctx.lineWidth = 1.6;
       groundEllipse(ctx, g.hint.x, 0.002, g.hint.z, 0.06); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // easy / normal: the sweet spot, a crosshair in the air where the ball is about to reach the top of its bounce.
+    // Meeting the ball there is perfect timing. Hidden once the ball has gone past it or clipped the net.
+    const sw = g.sweet;
+    if (g.diff.sweet && sw && (g.hitter === 'r' || isPvp()) && !g.netTouched && (g.phase === 'rally' || g.phase === 'serve') && (g.ball.z - sw.z) * Math.sign(sw.z) < 0.1) {
+      const P = proj(sw.x, sw.y, sw.z), rad = Math.max(6, 0.055 * P.s) * (reduced ? 1 : 1 + 0.08 * Math.sin(now / 120));
+      const c = isPvp() && g.hitter === 'p' ? '62,230,207' : '255,214,102';
+      ctx.strokeStyle = `rgba(${c},0.9)`; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(P.x, P.y, rad, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(P.x + dx * rad * 0.62, P.y + dy * rad * 0.62); ctx.lineTo(P.x + dx * rad * 1.4, P.y + dy * rad * 1.4); }
+      ctx.stroke();
     }
   }
   function drawFx(dt) {
@@ -887,6 +909,11 @@ button { font: inherit; color: inherit; }
         tone((1000 + 320 * k) * pt * dull, 0.05 + 0.02 * k, { to: (720 + 160 * k) * pt * dull, gain: (0.17 + 0.13 * k) * v, pan });
         noise(0.022 + 0.01 * k, { freq: (2500 + 1200 * k) * dull, gain: (0.1 + 0.13 * k) * v, pan });
       },
+      // perfect timing: two quick rising chimes on top of the hit
+      perfect(pan) {
+        tone(1568, 0.09, { type: 'triangle', gain: 0.12, pan, delay: 0.02 });
+        tone(2349, 0.16, { type: 'triangle', gain: 0.11, pan, delay: 0.08 });
+      },
       // table: a bright click plus the board's hollow body, louder for faster balls and softer at the far end
       bounce(pan, sp, z) {
         const k = clamp((sp || 4) / 9, 0, 1), d = z < 0 ? 0.75 : 1;
@@ -932,7 +959,7 @@ button { font: inherit; color: inherit; }
   // ---------------- vibration ----------------
   // iPhone Safari has no navigator.vibrate: the toggle stays hidden there and every call is skipped
   const canVibrate = typeof navigator.vibrate === 'function';
-  const BUZZ = { serve: 10, drive: 14, loop: 18, chop: 12, edge: 26, drop: 9, smash: 40, point: [18, 60, 18], lose: 70, win: [40, 70, 40, 70, 40, 110, 160] };
+  const BUZZ = { serve: 10, drive: 14, block: 16, loop: 18, chop: 12, edge: 26, drop: 9, smash: 40, perfect: [16, 30, 26], point: [18, 60, 18], lose: 70, win: [40, 70, 40, 70, 40, 110, 160] };
   function buzz(p) {
     if (!vibeOn || !canVibrate || p == null) return;
     try { navigator.vibrate(p); } catch (e) { /* ignore */ }
@@ -964,6 +991,15 @@ button { font: inherit; color: inherit; }
   const isPvp = () => game.mode === 'pvp';
   const nameOf = (s) => (isPvp() ? (s === 'p' ? '玩家 1' : '玩家 2') : s === 'p' ? '你' : 'R-11');
   const toneOf = (s) => (s === 'p' ? 'good' : 'p2');
+  // 球種名稱：帶明顯側旋的拉球叫側拐、削球叫側削、平擊叫側旋
+  const SHOT = { drive: '平擊', loop: '拉球', chop: '削球', drop: '放短', smash: '扣殺', block: '擋球' };
+  function shotName(e) {
+    const side = Math.abs(e.spinSide || 0) >= 0.3;
+    if (side && e.type === 'loop') return '側拐';
+    if (side && e.type === 'chop') return '側削';
+    if (side && e.type === 'drive') return '側旋';
+    return SHOT[e.type] || '';
+  }
   function resetHud() {
     $('scP').textContent = game.score.p; $('scR').textContent = game.score.r;
     $('status').textContent = ''; $('rally').textContent = ''; setServer(game.server);
@@ -972,7 +1008,7 @@ button { font: inherit; color: inherit; }
     $('whoP').textContent = $('endWhoP').textContent = nameOf('p');
     $('whoR').textContent = $('endWhoR').textContent = nameOf('r');
     $('stSmashL').textContent = pvp ? '玩家 1 擊球數' : '扣殺得分';
-    $('stHitsL').textContent = pvp ? '玩家 2 擊球數' : '你的擊球數';
+    $('stHitsL').textContent = pvp ? '玩家 2 擊球數' : '完美擊球';
     $('bChange').textContent = pvp ? '換模式或球速' : '換難度或造型';
     cv.setAttribute('aria-label', pvp ? '桌球場：雙人對戰，玩家 1 和玩家 2 各在球桌一端' : '桌球場：你在近端，對手 R-11 在遠端');
   }
@@ -1001,10 +1037,12 @@ button { font: inherit; color: inherit; }
     } else if (running && !paused && pointsPlayed < 5 && (game.phase === 'rally' || game.phase === 'serve')) {
       html = '擊球瞬間<b>輕推＝上旋</b>、<b>用力推＝扣殺</b>；<b>輕拉＝下旋</b>、<b>用力拉＝放短</b>；左右改方向，快速揮＝<b>側旋</b>';
     } else if (running && !paused && pointsPlayed < 10 && (game.phase === 'rally' || game.phase === 'serve')) {
-      html = '球的顏色：<b class="c-top">紅＝上旋</b>，輕拉化解；<b class="c-back">青＝下旋</b>，輕推化解；<b class="c-side">紫＝側旋</b>';
+      html = '球彈起來<b>快到最高點</b>時打到＝<b>完美</b>，不會打偏；' + (game.diff.sweet ? '往前或往後站，對準<b>準星</b>' : '看球外面的<b>亮圈</b>');
     } else if (running && !paused && pointsPlayed < 15 && (game.phase === 'rally' || game.phase === 'serve')) {
-      html = '<b>先往後拉再往前揮＝拉球</b>，上旋更強；<b>斜著揮＝側上旋</b>；拍子外面一小圈也打得到，但會<b>擦邊</b>';
+      html = '球的顏色：<b class="c-top">紅＝上旋</b>，輕拉化解；<b class="c-back">青＝下旋</b>，輕推化解；<b class="c-side">紫＝側旋</b>';
     } else if (running && !paused && pointsPlayed < 20 && (game.phase === 'rally' || game.phase === 'serve')) {
+      html = '<b>先往後拉再往前揮＝拉球</b>，上旋更強；<b>斜著揮＝側上旋</b>；拍子外面一小圈也打得到，但會<b>擦邊</b>';
+    } else if (running && !paused && pointsPlayed < 25 && (game.phase === 'rally' || game.phase === 'serve')) {
       html = '<b>上旋</b>落台會加速、<b>下旋</b>會變慢；用拍子的<b>左半邊或右半邊</b>打球，會摩擦球的側面帶出<b>側旋</b>';
     }
     if (html !== tipKey) { tipKey = html; $('tip').innerHTML = html; $('tip').hidden = !html; }
@@ -1058,7 +1096,7 @@ button { font: inherit; color: inherit; }
       $('endKicker').textContent = `${game.diff.name} · GAME`;
       $('endTitle').textContent = win ? '你贏了！' : 'R-11 獲勝';
       $('endP').textContent = game.score.p; $('endR').textContent = game.score.r;
-      $('stLong').textContent = game.longest; $('stSmash').textContent = game.smashWins; $('stHits').textContent = game.totalHits.p;
+      $('stLong').textContent = game.longest; $('stSmash').textContent = game.smashWins; $('stHits').textContent = game.perfects.p;
       $('endNote').textContent = win
         ? (game.diff.key === 'hard' ? '連困難的 R-11 都擋不住你。' : '可以挑戰更高的難度了。')
         : '多用左右移動把球打到 R-11 的兩邊，等高球再扣殺。';
@@ -1078,16 +1116,21 @@ button { font: inherit; color: inherit; }
         case 'hit': {
           const b = game.ball;
           Sound.hit(e.type, pan(e.x), e.speed, e.who);
-          if (e.who === 'p' || isPvp()) buzz(BUZZ[e.type]);
+          const human = e.who === 'p' || isPvp(), pvp = isPvp();
+          if (human) buzz(e.perfect ? BUZZ.perfect : BUZZ[e.type]);
+          if (e.perfect) { Sound.perfect(pan(e.x)); sparks(b.x, b.y, b.z, '#fff1b8', 10, 1.3); }
           // an edge hit (ball off the paddle's rim) throws grey wood chips instead of the player's colour
           sparks(b.x, b.y, b.z, e.type === 'edge' ? '#c9b89a' : e.who === 'p' ? '#ffb627' : '#3ee6cf', e.type === 'smash' ? 14 : 6, e.type === 'smash' ? 1.5 : 1);
-          if (e.type === 'edge') callout(isPvp() ? `${nameOf(e.who)} 擦邊！` : '擦邊！', 'neutral', isPvp() ? e.who : undefined);
-          else if (isPvp()) {
-            if (e.type === 'smash') { callout(`${nameOf(e.who)} 扣殺！`, toneOf(e.who), e.who); shake = 0.8; }
-            else if (e.type === 'drop') callout(`${nameOf(e.who)} 放短`, toneOf(e.who), e.who);
-          } else if (e.who === 'p' && e.type === 'smash') { callout('扣殺！', 'good'); shake = 1; }
-          else if (e.who === 'p' && e.type === 'drop') callout('放短', 'good');
-          else if (e.who === 'r' && e.type === 'smash') { callout('R-11 扣殺！', 'bad'); shake = 0.6; }
+          if (e.type === 'edge') callout(pvp ? `${nameOf(e.who)} 擦邊！` : '擦邊！', 'neutral', pvp ? e.who : undefined);
+          else if (human && e.timing) { // serves carry no timing and get no callout
+            // every shot a player makes is named; perfect timing is big and gold, otherwise it says early or late
+            const big = e.type === 'smash' || e.type === 'drop';
+            const name = (pvp && big ? nameOf(e.who) + ' ' : '') + shotName(e) + (e.type === 'smash' ? '！' : '');
+            const col = pvp ? ' ' + toneOf(e.who) : big ? ' good' : '';
+            if (e.perfect) callout('完美！' + name, 'perfect' + (pvp ? ' ' + toneOf(e.who) : ''), pvp ? e.who : undefined);
+            else callout(name + (e.timing === 'early' ? '・太早' : '・太晚'), (big ? '' : 'shot') + col, pvp ? e.who : undefined);
+            if (e.type === 'smash') shake = pvp ? 0.8 : 1;
+          } else if (!human && e.type === 'smash') { callout('R-11 扣殺！', 'bad'); shake = 0.6; }
           break;
         }
         case 'bounce': Sound.bounce(pan(e.x), e.speed, e.z); fx.push({ kind: 'ring', x: e.x, z: e.z, t: 0 }); break;

@@ -24,6 +24,7 @@
 - `engine.js` 用公尺：y 朝上（桌面 = 0），z 朝玩家為正，x 朝玩家右手為正。桌面半寬 `HX = 0.7625`、半長 `HZ = 1.37`，網高 `NET_H = 0.1525`。
 - 球的旋轉存在 `ball.spinTop`（+1 最強上旋、-1 最強下旋）和 `ball.spinSide`（+1 往 +x 彎）；`ball.spin` 只是給人看的名稱（`none`／`top`／`back`／`side`）。設定旋轉要用 `launch(g, v, { top, side })`，瞄準要把同一組旋轉傳給 `aimVelocity`，彎度才會算進去。
 - 玩家擊球的旋轉看兩件事：擊球瞬間拍子的速度，和擊球前 `PAD_HIST` 秒的揮拍路徑（`pad.hist`，`swingPath()` 算出引拍長度 `back` 和橫移 `lat`）。擊球範圍是 `pReach`，再外面 `SPINFX.edgeW` 那一圈算擦邊（`type: 'edge'`）。球偏離拍子中心（`off`）代表打在球的側面，會照 `SPINFX.contactSide` 帶出側旋：球偏右往右彎、偏左往左彎。
+- 擊球時機用 `timingOf(g, ball)` 算：球彈起後快到最高點（最高點前 `SPINFX.sweetLead` 秒）是最佳擊球點，前後 `DIFFS.perfect` 秒內打到是完美（hit 事件的 `perfect`、`timing`）。`g.sweet` 是預測的最佳擊球點，只要設定 `g.hint` 的地方都要一起設。球種名稱（平擊、拉球、側拐、擋球…）在 `index.html` 的 `shotName()`。
 - 落台照真實的摩擦算：上旋加速、下旋減速，增減的速度 = `SPINFX.fricTop`／`fricBack` × 旋轉強度 × (1 + e) × 落台時往下的速度，順著球前進的方向。沒有旋轉的球才用 `SPIN.none.kh`。
 - `skins.js` 用公分：y 朝下，原點在角色中心線的桌面高度。頭中心約在 y = -64，任何東西都不能畫到 y = -104 以上（會被計分板擋到，`skins.test.js` 會檢查）。
 
