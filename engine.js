@@ -13,7 +13,10 @@
     keepTop: 0.5, keepSide: 0.7, // 落台後剩下的旋轉比例
     recvY: 0.6, recvX: 0.45, recvSig: 0.03, // 接球時沒化解掉的來球旋轉讓回球偏掉多少
     smashTop: 1, // 扣殺帶的上旋
+    loopBack: 0.12, // 擊球前從拍子拉到最後面的位置往前揮超過這個距離（公尺），就算引拍拉球
+    edgeW: 0.045, // 擊球範圍外面再一圈（公尺）也算打到，但是打在拍子邊緣（擦邊）
   };
+  const PAD_HIST = 0.4; // 記住拍子最近幾秒的路徑，用來判斷引拍
   const SUB = 1 / 500;
   const PAD = { xMin: -1.05, xMax: 1.05, zMin: 0.9, zMax: 2.05, restZ: 1.62 };
   const ROB = { zRest: -1.62, zDeep: -1.85, xMax: 1.0 };
@@ -342,10 +345,30 @@
 
   // who：'p'（玩家、玩家 1）或 'r'（雙人模式的玩家 2）。
   // 都在擊球者自己的視角算（s = -1 時左右、前後翻過來），瞄準點和側旋最後再轉回世界座標。
+  // 引拍：擊球前 PAD_HIST 秒內拍子走過的路，在擊球者自己的視角算。
+  //   back：從拉到最後面的位置往前揮了多遠（公尺）；lat：往前揮的同時往自己右手邊移了多少（往左是負的）
+  function swingPath(p, s) {
+    const h = p.hist;
+    if (!h || h.length < 3) return { back: 0, lat: 0 };
+    let iMax = 0;
+    for (let i = 1; i < h.length; i++) if (s * h[i].z > s * h[iMax].z) iMax = i;
+    return { back: Math.max(0, s * (h[iMax].z - p.z)), lat: s * (p.x - h[iMax].x) };
+  }
+  function trackPad(p, t) {
+    const h = p.hist || (p.hist = []);
+    h.push({ x: p.x, z: p.z, t });
+    while (h.length && t - h[0].t > PAD_HIST) h.shift();
+  }
+  // 擦邊的程度：0 是打在拍面上；球在擊球範圍外面那一圈時是 0.35～1（越外面越偏）
+  function edgeOf(g, p, b) {
+    const dx = Math.abs(b.x - p.x), R = g.diff.pReach;
+    return dx <= R ? 0 : 0.35 + 0.65 * clamp((dx - R) / SPINFX.edgeW, 0, 1);
+  }
+
   function playerHit(g, who) {
     who = who === 'r' ? 'r' : 'p';
     const s = who === 'r' ? -1 : 1, b = g.ball, p = padOf(g, who), d = g.diff;
-    const off = clamp((s * (b.x - p.x)) / d.pReach, -1, 1);
+    const off = clamp((s * (b.x - p.x)) / d.pReach, -1, 1), edge = edgeOf(g, p, b);
     const push = -s * p.vz, side = s * p.vx;
     const inc = { top: b.spinTop || 0, side: b.spinSide || 0 }; // 來球的旋轉（側旋是世界座標）
     let type = 'drive', Tf, zt, top = 0;
@@ -365,8 +388,19 @@
     } else {
       Tf = 0.5 - 0.05 * clamp(push, 0, 1); zt = -0.72 - 0.4 * rng();
     }
-    // 快速左右揮：側旋，球往揮的方向彎（落點照舊，彎度算在瞄準裡）
-    const w = { top, side: s * Math.sign(side) * 0.9 * clamp((Math.abs(side) - 1.0) / 1.2, 0, 1) };
+    // 引拍後往前揮＝拉球：拉得越後面、揮得越快，上旋越強。斜著往前揮，有一部分變成側旋（側上旋）
+    const sw = swingPath(p, s);
+    let loopSide = 0;
+    if (type !== 'smash' && push > 0.25 && sw.back >= SPINFX.loopBack) {
+      const k = clamp(0.45 + 2.2 * (sw.back - SPINFX.loopBack) + 0.3 * clamp(push, 0, 1), 0.45, 1);
+      const ang = Math.atan2(sw.lat, sw.back); // 0：直直往前拉；接近 ±90°：幾乎是橫著拉
+      type = 'loop'; top = Math.max(top, k * Math.cos(ang)); loopSide = 0.9 * k * Math.sin(ang);
+    }
+    // 快速左右揮：側旋，球往揮的方向彎（落點照舊，彎度算在瞄準裡）。
+    // 往自己右手邊揮是右側旋、往左揮是左側旋；平著橫揮會帶一點上旋，往後拉著橫揮則是側下旋
+    const swipe = Math.sign(side) * 0.9 * clamp((Math.abs(side) - 1.0) / 1.2, 0, 1);
+    if (swipe !== 0 && type === 'drive') top = Math.max(top, 0.3 * Math.abs(swipe));
+    const w = { top, side: s * clamp(swipe + loopSide, -1, 1) };
     if (d.key === 'easy') sig *= 0.6;
     let xt = 0.42 * off + 0.24 * side + gauss() * sig;
     xt = d.key === 'easy' ? clamp(xt, -0.72, 0.72) : clamp(xt, -1.3, 1.3);
@@ -376,11 +410,21 @@
     if (type !== 'smash' || b.y > 0.16) {
       for (let n = 0; n < 14 && netMargin(b, v, w) < 0.02; n++) { Tf += 0.03; v = aimVelocity(b, xt, zt, Tf, w); }
     }
+    if (edge > 0) {
+      // 擦邊：球打在拍子邊緣，力量和旋轉大多傳不過去，球往打到的那一側歪掉，高度也不穩
+      const out = Math.sign(b.x - p.x) || 1;
+      v.vx = v.vx * (1 - 0.35 * edge) + out * (0.5 + 1.1 * edge) * (0.6 + 0.4 * rng());
+      v.vz *= 0.88 - 0.3 * edge;
+      v.vy += (rng() * 1.6 - 0.5) * (0.4 + 0.6 * edge);
+      w.top = w.top * (1 - 0.75 * edge) + (rng() - 0.5) * 0.3;
+      w.side = w.side * (1 - 0.75 * edge) + out * 0.3 * edge;
+      type = 'edge';
+    }
     const kick = receiveKick(inc, w);
     v.vx += kick.vx; v.vy += kick.vy;
     g.hitter = who; g.lastShot[who] = type; g.totalHits[who]++; p.swing = 1;
     launch(g, v, w);
-    g.events.push({ kind: 'hit', who, type, x: b.x, speed: Math.hypot(v.vx, v.vz), spin: b.spin, spinTop: b.spinTop, spinSide: b.spinSide });
+    g.events.push({ kind: 'hit', who, type, x: b.x, speed: Math.hypot(v.vx, v.vz), spin: b.spin, spinTop: b.spinTop, spinSide: b.spinSide, edge });
     if (g.mode === 'pvp') g.hint = predictBounce(g, otherSide(who));
     else planRobot(g);
   }
@@ -431,10 +475,10 @@
     const b = g.ball;
     if (g.hitter === 'r' && b.vz > 0) {
       const p = g.pad;
-      if (Math.abs(b.z - p.z) < 0.075 && Math.abs(b.x - p.x) < g.diff.pReach && b.y > -0.1 && b.y < 0.9) playerHit(g);
+      if (Math.abs(b.z - p.z) < 0.075 && Math.abs(b.x - p.x) < g.diff.pReach + SPINFX.edgeW && b.y > -0.1 && b.y < 0.9) playerHit(g);
     } else if (g.hitter === 'p' && b.vz < 0 && g.mode === 'pvp') {
       const q = g.pad2;
-      if (Math.abs(b.z - q.z) < 0.075 && Math.abs(b.x - q.x) < g.diff.pReach && b.y > -0.1 && b.y < 0.9) playerHit(g, 'r');
+      if (Math.abs(b.z - q.z) < 0.075 && Math.abs(b.x - q.x) < g.diff.pReach + SPINFX.edgeW && b.y > -0.1 && b.y < 0.9) playerHit(g, 'r');
     } else if (g.hitter === 'p' && b.vz < 0) {
       const r = g.robot;
       if (Math.abs(b.z - r.z) < 0.075 && Math.abs(b.x - r.x) < g.diff.rReach && b.y > -0.1 && b.y < 0.9) robotHit(g);
@@ -540,8 +584,8 @@
     dt = Math.min(dt, 0.05);
     g.time += dt;
     const p = g.pad, b = g.ball, pvp = g.mode === 'pvp';
-    movePad(p, dt, PAD.zMin, PAD.zMax);
-    if (pvp) movePad(g.pad2, dt, -PAD.zMax, -PAD.zMin);
+    movePad(p, dt, PAD.zMin, PAD.zMax); trackPad(p, g.time);
+    if (pvp) { movePad(g.pad2, dt, -PAD.zMax, -PAD.zMin); trackPad(g.pad2, g.time); }
     g.robot.swing = Math.max(0, g.robot.swing - dt * 5);
     if (g.robot.moodT > 0) { g.robot.moodT -= dt; if (g.robot.moodT <= 0) g.robot.mood = 'idle'; }
     if (g.phase === 'over') return;
@@ -554,6 +598,6 @@
     if (pvp) padHeight(g.pad2, b, live && g.hitter === 'p' && b.z < 0, dt);
   }
 
-  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, spinAccel, receiveKick, setRng: (f) => { rng = f; } };
+  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit, checkHits, swingPath }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, spinAccel, receiveKick, setRng: (f) => { rng = f; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.PingPong = API;
 })(this);
