@@ -170,5 +170,43 @@ ok(finish2(9, 10, 'r') === 'r', '玩家 2 拿到 11:9 獲勝');
 ok(finish2(10, 10, 'r') === null && finish2(11, 11, 'p') === null, 'Deuce 之後 10:11、12:11 都還沒結束');
 ok(finish2(11, 12, 'r') === 'r' && finish2(12, 11, 'p') === 'p', 'Deuce 之後領先 2 分才獲勝（11:13、13:11）');
 
+console.log('三戰兩勝／五戰三勝');
+// 讓 who 拿下目前這一局（對手 5 分），回傳最後一分的 point 事件
+function winGame(x, who) {
+  x.score.p = who === 'p' ? 10 : 5; x.score.r = who === 'r' ? 10 : 5;
+  x.phase = 'rally'; x.hitter = who; x.events.length = 0;
+  E._test.point(x, who, 'miss');
+  return x.events.find((e) => e.kind === 'point');
+}
+// 一局打完後走到下一局（跑完死球時間和局間休息）
+function toNextGame(x) { x.events.length = 0; E._test.afterPoint(x); const ev = x.events.slice(); step(x, E.BREAK_SECS + 0.5); return ev; }
+
+ok(E.createGame('normal').match.bestOf === 1 && E.createGame('normal', { bestOf: 4 }).match.bestOf === 1, '預設一局制；不合法的局數（4）當成一局制');
+ok(winGame(E.createGame('normal'), 'p').over === true, '一局制：拿下一局就贏得比賽，跟原本一樣');
+
+let m = pvp({ bestOf: 3, first: 'p' });
+let ev = winGame(m, 'p');
+ok(ev.gameOver && !ev.over && m.winner === null && m.match.games.p === 1, '三戰兩勝：玩家 1 拿下第 1 局，比賽還沒結束');
+let brk = toNextGame(m);
+ok(brk.some((e) => e.kind === 'gameEnd' && e.winner === 'p' && e.gameNo === 1 && e.last.p === 11 && e.last.r === 5), '局間會發出「這局結束」事件，帶著這局比分 11:5');
+ok(m.match.gameNo === 2 && m.score.p === 0 && m.score.r === 0 && m.phase === 'serveWait', '休息完自動進入第 2 局，比分歸零');
+ok(m.server === 'r', '第 2 局由上一局先接發球的玩家 2 先發球');
+winGame(m, 'r'); toNextGame(m);
+ok(m.match.games.p === 1 && m.match.games.r === 1 && m.match.gameNo === 3 && m.server === 'p', '1:1 進入第 3 局，又換玩家 1 先發球');
+ev = winGame(m, 'r');
+ok(ev.over && m.winner === 'r' && m.match.games.r === 2, '玩家 2 先拿到 2 局 → 贏得整場比賽');
+m.events.length = 0; E._test.afterPoint(m);
+ok(m.phase === 'over' && m.events.some((e) => e.kind === 'gameover' && e.winner === 'r'), '比賽結束後進入結算，不會再開下一局');
+ok(m.match.history.length === 3 && m.match.history[1].r === 11, '每局比分都有記下來');
+
+m = pvp({ bestOf: 5 });
+for (let i = 0; i < 2; i++) { winGame(m, 'p'); toNextGame(m); }
+ok(m.winner === null && m.match.games.p === 2, '五戰三勝：拿 2 局還沒贏');
+ev = winGame(m, 'p');
+ok(ev.over && m.winner === 'p' && m.match.games.p === 3, '五戰三勝：先拿到 3 局才贏得比賽');
+
+m = pvp({ bestOf: 3 }); m.score.p = 11; m.score.r = 11; m.phase = 'rally'; m.hitter = 'p'; E._test.point(m, 'p', 'miss');
+ok(m.match.games.p === 0 && !m.gameWinner, 'Deuce 中途（12:11）不算拿下這局');
+
 console.log(fails ? `\n${fails} 項失敗` : '\n全部通過');
 process.exit(fails ? 1 : 0);

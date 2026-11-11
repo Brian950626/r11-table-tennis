@@ -199,6 +199,10 @@
 
   // ---------- game ----------
   // opts.mode：'cpu'（預設，對戰 R-11）或 'pvp'（雙人對戰：'r' 那一邊改由玩家 2 用 pad2 操控）
+  const BEST_OF = [1, 3, 5];
+  const BREAK_SECS = 3.2; // 一局打完、下一局開始前的休息時間（秒）
+  const gamesToWin = (g) => Math.floor(g.match.bestOf / 2) + 1;
+
   function createGame(diffKey, opts) {
     opts = opts || {};
     if (opts.rng) rng = opts.rng;
@@ -216,6 +220,8 @@
       rallyHits: 0, longest: 0, smashWins: 0, totalHits: { p: 0, r: 0 }, perfects: { p: 0, r: 0 }, lastPerfect: false,
       aim: { x: 0, z: -0.8 }, serveData: null, lastShot: { p: 'drive', r: 'drive' },
       hint: null, winner: null, events: [], time: 0,
+      // 整場比賽：bestOf 是幾戰幾勝（1、3、5），games 是各贏幾局，history 是打完的每局比分
+      match: { bestOf: BEST_OF.includes(opts.bestOf) ? opts.bestOf : 1, games: { p: 0, r: 0 }, gameNo: 1, history: [] },
     };
     applyStyle(g, opts.style || defaultStyle);
     resetForServe(g, true);
@@ -302,9 +308,24 @@
     g.phase = 'dead'; g.timer = 1.55; g.robot.plan = null; g.hint = null; g.sweet = null;
     g.robot.mood = winner === 'r' ? 'happy' : 'sad'; g.robot.moodT = 1.9;
     const sp = g.score.p, sr = g.score.r;
-    const over = (sp >= 11 || sr >= 11) && Math.abs(sp - sr) >= 2;
-    if (over) g.winner = winner;
-    g.events.push({ kind: 'point', winner, reason, hitter: g.hitter, rally: g.rallyHits, shot: g.lastShot[g.hitter], over });
+    // gameOver：這一局打完；over：整場比賽打完（一局制時兩個一樣）
+    const gameOver = (sp >= 11 || sr >= 11) && Math.abs(sp - sr) >= 2;
+    let over = false;
+    if (gameOver) {
+      const m = g.match;
+      m.games[winner]++; m.history.push({ p: sp, r: sr });
+      over = m.games[winner] >= gamesToWin(g);
+      if (over) g.winner = winner; else g.gameWinner = winner;
+    }
+    g.events.push({ kind: 'point', winner, reason, hitter: g.hitter, rally: g.rallyHits, shot: g.lastShot[g.hitter], over, gameOver, games: { p: g.match.games.p, r: g.match.games.r }, gameNo: g.match.gameNo });
+  }
+
+  // 下一局：比分歸零；上一局先接發球的人這局先發球（正式規則）
+  function nextGame(g) {
+    g.match.gameNo++; g.gameWinner = null;
+    g.score.p = 0; g.score.r = 0;
+    g.first = otherSide(g.first);
+    resetForServe(g, true);
   }
 
   function letServe(g) {
@@ -316,6 +337,12 @@
   function afterPoint(g) {
     g.isLet = false;
     if (g.winner) { g.phase = 'over'; g.events.push({ kind: 'gameover', winner: g.winner }); return; }
+    if (g.gameWinner) {
+      const m = g.match;
+      g.phase = 'break'; g.timer = BREAK_SECS;
+      g.events.push({ kind: 'gameEnd', winner: g.gameWinner, gameNo: m.gameNo, games: { p: m.games.p, r: m.games.r }, last: m.history[m.history.length - 1] });
+      return;
+    }
     resetForServe(g);
   }
 
@@ -641,12 +668,13 @@
     let rem = dt * g.diff.ts;
     while (rem > 1e-10) { const h = Math.min(SUB, rem); substep(g, h); rem -= h; }
     if (g.phase === 'dead') { g.timer -= dt; if (g.timer <= 0) afterPoint(g); }
+    else if (g.phase === 'break') { g.timer -= dt; if (g.timer <= 0) nextGame(g); }
     else if (g.phase === 'serveWait' && !human(g, g.server)) { g.timer -= dt; if (g.timer <= 0) startToss(g); }
     const live = g.phase === 'rally' || g.phase === 'serve';
     padHeight(p, b, live && g.hitter === 'r' && b.z > 0, dt);
     if (pvp) padHeight(g.pad2, b, live && g.hitter === 'p' && b.z < 0, dt);
   }
 
-  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit, checkHits, swingPath, timingOf }, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, predictSweet, timingOf, spinAccel, receiveKick, setRng: (f) => { rng = f; } };
+  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit, nextGame, checkHits, swingPath, timingOf }, BEST_OF, BREAK_SECS, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, predictSweet, timingOf, spinAccel, receiveKick, setRng: (f) => { rng = f; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.PingPong = API;
 })(this);

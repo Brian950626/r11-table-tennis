@@ -44,6 +44,11 @@ button { font: inherit; color: inherit; }
 }
 .flip::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: var(--ink); }
 .flip span { display: inline-block; }
+/* games won in a best-of-3/5 match: one dot per game needed, filled when won */
+.games { display: flex; gap: 4px; }
+.games[hidden] { display: none; }
+.games i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--muted); }
+.games i.on { background: var(--accent); border-color: var(--accent); }
 .flip.anim span { animation: flip 0.38s ease-out; }
 @keyframes flip { 0% { transform: rotateX(90deg); opacity: 0.2; } 100% { transform: none; opacity: 1; } }
 .srv { font-size: 11px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 4px; visibility: hidden; }
@@ -205,9 +210,9 @@ button { font: inherit; color: inherit; }
   <div class="hud">
     <span class="tag" id="diffTag">普通</span>
     <div class="board" aria-live="polite">
-      <div class="side"><span class="who" id="whoP">你</span><div class="flip" id="flipP"><span id="scP">0</span></div><span class="srv on" id="srvP">發球</span></div>
+      <div class="side"><span class="who" id="whoP">你</span><div class="flip" id="flipP"><span id="scP">0</span></div><span class="games" id="gmP" hidden></span><span class="srv on" id="srvP">發球</span></div>
       <div class="mid"><span class="vs">VS</span><span class="status" id="status"></span><span class="rally" id="rally"></span></div>
-      <div class="side"><span class="who" id="whoR">R-11</span><div class="flip" id="flipR"><span id="scR">0</span></div><span class="srv" id="srvR">發球</span></div>
+      <div class="side"><span class="who" id="whoR">R-11</span><div class="flip" id="flipR"><span id="scR">0</span></div><span class="games" id="gmR" hidden></span><span class="srv" id="srvR">發球</span></div>
     </div>
     <button class="icon-btn" id="bPause" type="button" aria-label="暫停"><i></i></button>
   </div>
@@ -233,7 +238,7 @@ button { font: inherit; color: inherit; }
       <h1 class="cpu-only">對手：<span class="num">R-11</span></h1>
       <h1 class="pvp-only">雙人對戰</h1>
       <p class="lede cpu-only">一局 11 分。移動球拍接球，擊球那一下怎麼動，球就怎麼飛。</p>
-      <p class="lede pvp-only">一局 11 分。兩個人在同一支手機或同一台電腦上對打，各自控制一支球拍。</p>
+      <p class="lede pvp-only">每局 11 分，可以打一局、三戰兩勝或五戰三勝。兩個人在同一支手機或同一台電腦上對打，各自控制一支球拍。</p>
       <p class="label">模式</p>
       <div class="diffs modes" id="modes" role="group" aria-label="模式">
         <button type="button" data-mode="cpu" aria-pressed="true"><b>對戰 R-11</b><small>一個人跟 R-11 打</small></button>
@@ -244,6 +249,12 @@ button { font: inherit; color: inherit; }
         <button type="button" id="dEasy" data-diff="easy" aria-pressed="false"><b>簡單</b><small>球速慢，會標出落點</small></button>
         <button type="button" id="dNormal" data-diff="normal" aria-pressed="true"><b>普通</b><small class="cpu-only">會打你的反手角落</small><small class="pvp-only">標準球速</small></button>
         <button type="button" id="dHard" data-diff="hard" aria-pressed="false"><b>困難</b><small class="cpu-only">球速快，會扣殺和放短</small><small class="pvp-only">球速快，要反應更快</small></button>
+      </div>
+      <p class="label pvp-only">局數</p>
+      <div class="diffs pvp-only" id="bestOfs" role="group" aria-label="局數">
+        <button type="button" data-best="1" aria-pressed="true"><b>一局</b><small>先拿 11 分</small></button>
+        <button type="button" data-best="3" aria-pressed="false"><b>三戰兩勝</b><small>先贏 2 局</small></button>
+        <button type="button" data-best="5" aria-pressed="false"><b>五戰三勝</b><small>先贏 3 局</small></button>
       </div>
       <p class="label cpu-only">對手造型</p>
       <div class="skins cpu-only" id="skinsMenu" role="group" aria-label="對手造型"></div>
@@ -385,6 +396,9 @@ button { font: inherit; color: inherit; }
   // mode: 'cpu' = vs R-11, 'pvp' = two players on one device ('r' side becomes player 2)
   let modeKey = 'cpu', pvpFirst = 'p';
   try { if (localStorage.getItem('r11-mode') === 'pvp') modeKey = 'pvp'; } catch (e) { /* storage unavailable */ }
+  // two-player match length: 1 game, best of 3 or best of 5
+  let bestOf = 1;
+  try { const v = Number(localStorage.getItem('r11-bestof')); if (E.BEST_OF.includes(v)) bestOf = v; } catch (e) { /* storage unavailable */ }
   const currentSkin = () => SK.byId[skinId] || SK.list[0];
   let game = E.createGame(diffKey, { mode: modeKey }), running = false, paused = false, pointsPlayed = 0, lastPointer = coarse ? 'touch' : 'mouse';
   const input = { tx: 0, tz: PAD.restZ };
@@ -991,6 +1005,20 @@ button { font: inherit; color: inherit; }
   const isPvp = () => game.mode === 'pvp';
   const nameOf = (s) => (isPvp() ? (s === 'p' ? '玩家 1' : '玩家 2') : s === 'p' ? '你' : 'R-11');
   const toneOf = (s) => (s === 'p' ? 'good' : 'p2');
+  const BEST_NAME = { 1: '一局', 3: '三戰兩勝', 5: '五戰三勝' };
+  const gamesToWin = () => Math.floor(game.match.bestOf / 2) + 1;
+  // 多局制時，只有再贏這局就拿下整場的才叫「賽末點」，其他叫「局末點」
+  const pointName = (s) => (game.match.bestOf > 1 && game.match.games[s] < gamesToWin() - 1 ? '局末點' : '賽末點');
+  function renderGames() {
+    const m = game.match, show = m.bestOf > 1;
+    for (const [s, id] of [['p', 'gmP'], ['r', 'gmR']]) {
+      const el = $(id);
+      el.hidden = !show; el.textContent = '';
+      if (!show) { el.removeAttribute('aria-label'); continue; }
+      for (let i = 0; i < gamesToWin(); i++) { const d = document.createElement('i'); if (i < m.games[s]) d.className = 'on'; el.append(d); }
+      el.setAttribute('aria-label', `${nameOf(s)} 贏 ${m.games[s]} 局`);
+    }
+  }
   // 球種名稱：帶明顯側旋的拉球叫側拐、削球叫側削、平擊叫側旋
   const SHOT = { drive: '平擊', loop: '拉球', chop: '削球', drop: '放短', smash: '扣殺', block: '擋球' };
   function shotName(e) {
@@ -1002,6 +1030,7 @@ button { font: inherit; color: inherit; }
   }
   function resetHud() {
     $('scP').textContent = game.score.p; $('scR').textContent = game.score.r;
+    renderGames();
     $('status').textContent = ''; $('rally').textContent = ''; setServer(game.server);
     $('diffTag').textContent = isPvp() ? `雙人 · ${game.diff.name}` : game.diff.name;
     const pvp = isPvp();
@@ -1064,7 +1093,8 @@ button { font: inherit; color: inherit; }
       const W = nameOf(e.winner), L = nameOf(e.winner === 'p' ? 'r' : 'p');
       const why = { miss: `${L} 沒接到`, out: `${L} 打出界`, net: `${L} 掛網`, double: `${L} 沒接到短球`, ownSide: `${L} 失誤`, serveFault: `${L} 發球失誤` };
       const won = e.hitter === e.winner && (e.reason === 'miss' || e.reason === 'double');
-      const main = e.over ? `${W} 拿下這局` : won && e.shot === 'smash' ? `${W} 扣殺得分！` : won && e.shot === 'drop' ? `${W} 放短得分！` : `${W} 得分`;
+      if (e.gameOver) renderGames();
+      const main = e.over ? (game.match.bestOf > 1 ? `${W} 贏得比賽` : `${W} 拿下這局`) : e.gameOver ? `${W} 拿下第 ${e.gameNo} 局` : won && e.shot === 'smash' ? `${W} 扣殺得分！` : won && e.shot === 'drop' ? `${W} 放短得分！` : `${W} 得分`;
       banner(main, why[e.reason], toneOf(e.winner));
       return;
     }
@@ -1077,14 +1107,27 @@ button { font: inherit; color: inherit; }
       banner(e.over ? '輸了這局' : '失分', sub, 'bad');
     }
   }
+  // 多局制：一局打完、休息後自動開下一局
+  function onGameEnd(e) {
+    renderGames();
+    const next = nameOf(game.first === 'p' ? 'r' : 'p');
+    queued = null;
+    banner(`第 ${e.gameNo} 局 ${nameOf(e.winner)} 勝`, `${e.last.p}:${e.last.r}　局數 ${e.games.p}:${e.games.r}　下一局 ${next} 先發球`, toneOf(e.winner), Math.round(E.BREAK_SECS * 1000) - 300);
+  }
   function onServeReady(e) {
     setServer(e.server);
     trail.length = 0;
+    if (e.initial && game.match.gameNo > 1) { // 新的一局
+      resetHud(); queued = null;
+      const m = game.match, decider = m.games.p === gamesToWin() - 1 && m.games.r === gamesToWin() - 1;
+      banner(decider ? `決勝局！第 ${m.gameNo} 局` : `第 ${m.gameNo} 局開始`, `局數 ${m.games.p}:${m.games.r}　${nameOf(e.server)} 先發球`, '', 1500);
+      return;
+    }
     const gp2 = isPvp() && e.gamePoint ? nameOf(e.gamePoint) : '';
-    const st = e.deuce ? 'Deuce 平分' : gp2 ? `${gp2} 賽末點` : e.gamePoint === 'p' ? '你的賽末點' : e.gamePoint === 'r' ? 'R-11 賽末點' : '';
+    const st = e.deuce ? 'Deuce 平分' : gp2 ? `${gp2} ${pointName(e.gamePoint)}` : e.gamePoint === 'p' ? '你的賽末點' : e.gamePoint === 'r' ? 'R-11 賽末點' : '';
     $('status').textContent = st;
     if (e.deuce && !e.initial) Sound.deuce();
-    if (!e.initial && st) queued = [st, e.deuce ? '要連拿 2 分才能贏' : gp2 ? `${gp2} 再拿 1 分就贏了` : e.gamePoint === 'p' ? '再拿 1 分就贏了' : '守住這一分', 'neutral', 1200];
+    if (!e.initial && st) queued = [st, e.deuce ? '要連拿 2 分才能贏' : gp2 ? (pointName(e.gamePoint) === '局末點' ? `${gp2} 再拿 1 分就拿下這局` : `${gp2} 再拿 1 分就贏了`) : e.gamePoint === 'p' ? '再拿 1 分就贏了' : '守住這一分', 'neutral', 1200];
     // the point banner (1.4 s) usually hides before serveReady (dead time 1.55 s), so show it now instead of waiting
     if (queued && $('banner').hidden) { const q = queued; queued = null; banner(q[0], q[1], q[2], q[3]); }
   }
@@ -1093,6 +1136,7 @@ button { font: inherit; color: inherit; }
     Sound.end(win || isPvp()); // 雙人對戰總有一個人贏，都放勝利音效
     if (win || isPvp()) buzz(BUZZ.win);
     setTimeout(() => {
+      $('bAgain').textContent = isPvp() && game.match.bestOf > 1 ? '再來一場' : '再來一局';
       $('endKicker').textContent = `${game.diff.name} · GAME`;
       $('endTitle').textContent = win ? '你贏了！' : 'R-11 獲勝';
       $('endP').textContent = game.score.p; $('endR').textContent = game.score.r;
@@ -1101,10 +1145,14 @@ button { font: inherit; color: inherit; }
         ? (game.diff.key === 'hard' ? '連困難的 R-11 都擋不住你。' : '可以挑戰更高的難度了。')
         : '多用左右移動把球打到 R-11 的兩邊，等高球再扣殺。';
       if (isPvp()) {
-        $('endKicker').textContent = `雙人對戰 · ${game.diff.name}`;
-        $('endTitle').textContent = `${nameOf(e.winner)} 獲勝！`;
+        const m = game.match, multi = m.bestOf > 1, nextFirst = nameOf(pvpFirst === 'p' ? 'r' : 'p');
+        $('endKicker').textContent = multi ? `雙人對戰 · ${BEST_NAME[m.bestOf]} · ${game.diff.name}` : `雙人對戰 · ${game.diff.name}`;
+        $('endTitle').textContent = multi ? `${nameOf(e.winner)} 贏得比賽！` : `${nameOf(e.winner)} 獲勝！`;
+        if (multi) { $('endP').textContent = m.games.p; $('endR').textContent = m.games.r; } // 大比分顯示局數
         $('stSmash').textContent = game.totalHits.p; $('stHits').textContent = game.totalHits.r;
-        $('endNote').textContent = `再來一局的話，換${nameOf(pvpFirst === 'p' ? 'r' : 'p')} 先發球。`;
+        $('endNote').textContent = multi
+          ? `各局：${m.history.map((h) => `${h.p}:${h.r}`).join('、')}。再來一場的話，換${nextFirst} 先發球。`
+          : `再來一局的話，換${nextFirst} 先發球。`;
       }
       $('endMenu').hidden = false; $('bAgain').focus();
     }, 500);
@@ -1141,6 +1189,7 @@ button { font: inherit; color: inherit; }
         case 'point': onPoint(e); break;
         case 'let': banner('擦網重發', '發球擦網後落在對面，這球重發', '', 1300); break;
         case 'serveReady': onServeReady(e); break;
+        case 'gameEnd': onGameEnd(e); break;
         case 'gameover': onGameOver(e); saveGameRecord(); break;
       }
     }
@@ -1261,6 +1310,11 @@ button { font: inherit; color: inherit; }
     for (const b of $('diffs').querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset.diff === k ? 'true' : 'false');
     try { localStorage.setItem('r11-diff', k); } catch (e) { /* ignore */ }
   }
+  function setBestOf(n) {
+    bestOf = E.BEST_OF.includes(n) ? n : 1;
+    for (const b of $('bestOfs').querySelectorAll('button')) b.setAttribute('aria-pressed', Number(b.dataset.best) === bestOf ? 'true' : 'false');
+    try { localStorage.setItem('r11-bestof', String(bestOf)); } catch (e) { /* ignore */ }
+  }
   function setMode(m) {
     modeKey = m === 'pvp' ? 'pvp' : 'cpu';
     for (const b of $('modes').querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset.mode === modeKey ? 'true' : 'false');
@@ -1331,7 +1385,7 @@ button { font: inherit; color: inherit; }
     Sound.init();
     // two-player rematch: the other player serves first
     if (modeKey === 'pvp' && game.mode === 'pvp' && game.phase === 'over') pvpFirst = pvpFirst === 'p' ? 'r' : 'p';
-    game = E.createGame(diffKey, { mode: modeKey, first: modeKey === 'pvp' ? pvpFirst : 'p' });
+    game = E.createGame(diffKey, { mode: modeKey, first: modeKey === 'pvp' ? pvpFirst : 'p', bestOf: modeKey === 'pvp' ? bestOf : 1 });
     game.events.length = 0;
     input.tx = 0; input.tz = PAD.restZ; game.pad.tx = 0; game.pad.tz = PAD.restZ;
     input2.tx = 0; input2.tz = -PAD.restZ; game.pad2.tx = 0; game.pad2.tz = -PAD.restZ;
@@ -1346,7 +1400,7 @@ button { font: inherit; color: inherit; }
     if (!running || paused || game.phase === 'over') return;
     paused = true; keys.clear(); releaseTouches();
     $('pauseScore').textContent = isPvp()
-      ? `比分 玩家 1 ${game.score.p} : ${game.score.r} 玩家 2　·　球速${game.diff.name}`
+      ? `${game.match.bestOf > 1 ? `第 ${game.match.gameNo} 局（局數 ${game.match.games.p}:${game.match.games.r}）　` : ''}比分 玩家 1 ${game.score.p} : ${game.score.r} 玩家 2　·　球速${game.diff.name}`
       : `比分 你 ${game.score.p} : ${game.score.r} R-11　·　${game.diff.name}`;
     $('pauseMenu').hidden = false; gameEl.classList.remove('playing'); $('bResume').focus();
   }
@@ -1358,6 +1412,7 @@ button { font: inherit; color: inherit; }
   }
 
   $('modes').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
+  $('bestOfs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setBestOf(Number(b.dataset.best)); });
   $('diffs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setDiff(b.dataset.diff); });
   $('bStart').addEventListener('click', start);
   $('bServe').addEventListener('click', () => tryServe(isPvp() ? game.server : 'p'));
@@ -1562,7 +1617,7 @@ button { font: inherit; color: inherit; }
     if (typeof data.soundOn === 'boolean') soundOn = data.soundOn;
     if (data.skinId && SK.byId[data.skinId]) skinId = data.skinId;
     buildPicker('skinsMenu', 'skinDescMenu'); buildPicker('skinsPause', 'skinDescPause');
-    setDiff(diffKey); setSound(soundOn); setSkin(skinId, false); setMode(modeKey);
+    setDiff(diffKey); setSound(soundOn); setSkin(skinId, false); setMode(modeKey); setBestOf(bestOf);
     setVibe(vibeOn, false);
     if (!canVibrate) for (const id of ['vib1', 'vib2']) $(id).closest('label').hidden = true;
     new ResizeObserver(resize).observe(gameEl);
