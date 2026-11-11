@@ -1,10 +1,12 @@
 // 造型測試：用一個假的畫布把每個造型的每種表情都畫一遍，確認
 //   1. 每個造型的 id 不重複，名稱、說明、手臂顏色都有填
-//   2. 畫的時候不會出錯
-//   3. 沒有畫到頭頂上方太高的地方（會被計分板擋到）
-//   4. save() 和 restore() 有成對出現
+//   2. 每個造型的打法（style）在 engine.js 的 STYLES 裡，說明裡有寫出打法
+//   3. 畫的時候不會出錯
+//   4. 沒有畫到頭頂上方太高的地方（會被計分板擋到）
+//   5. save() 和 restore() 有成對出現
 // 執行：node skins.test.js
 const SK = require('./skins.js');
+const E = require('./engine.js');
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? '  通過  ' : '  失敗  ') + msg); if (!cond) fails++; };
 const TOP_LIMIT = -104; // 公分；頭頂不要畫到比這更高
@@ -50,6 +52,8 @@ ok(ids.length > 0 && new Set(ids).size === ids.length, `id 沒有重複（${ids.
 for (const s of SK.list) {
   const filled = s.name && s.title && s.desc && s.arm && typeof s.arm.color === 'string' && typeof s.torso === 'function' && typeof s.head === 'function';
   ok(!!filled, `${s.title || s.id}：名稱、說明、手臂顏色、torso、head 都有`);
+  const style = E.STYLES[s.style];
+  ok(!!style && s.desc.includes(`打法「${style.name}」`), `${s.title || s.id}：打法 ${s.style} 存在，說明裡有寫「打法「${style ? style.name : '？'}」」`);
 }
 
 console.log('每種表情都畫一遍');
