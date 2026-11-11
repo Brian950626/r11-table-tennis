@@ -264,7 +264,8 @@ button { font: inherit; color: inherit; }
         <div><dt>方向</dt><dd>擊球瞬間往左或往右移動，球就往那邊飛；動太大會出界。</dd></div>
         <div><dt>扣殺</dt><dd>擊球瞬間用力往前推。球要彈得夠高再扣，低球容易掛網。</dd></div>
         <div><dt>放短</dt><dd>擊球瞬間用力往後拉，球會落在網前。</dd></div>
-        <div><dt>旋轉</dt><dd>擊球瞬間輕推＝上旋、輕拉＝下旋、快速往右揮＝右側旋、往左揮＝左側旋（球會往揮的方向彎）。</dd></div>
+        <div><dt>旋轉</dt><dd>擊球瞬間輕推＝上旋，落到對面桌上會加速往前衝；輕拉＝下旋，落台後會變慢。往右揮＝右側旋、往左揮＝左側旋（球往揮的方向彎），揮得越快越強。推得越快，球也飛得越快。</dd></div>
+        <div><dt>打側面</dt><dd>球偏在拍子右邊＝摩擦到球的左側，球往右彎；偏在左邊＝摩擦到球的右側，球往左彎。跟揮拍方向相反的那一側，側旋會反過來。</dd></div>
         <div><dt>拉球</dt><dd>擊球前先往後拉（引拍）再往前揮，上旋更強；引拍越長、揮得越快越強。從斜後方斜著往前揮＝側上旋，往後拉同時左右揮＝側下旋。</dd></div>
         <div><dt>擦邊</dt><dd>球從拍子外面一小圈經過也打得到，但會打在拍子邊緣：球變慢、往那一側歪掉，旋轉也沒了。</dd></div>
         <div><dt>接旋轉</dt><dd>看球的顏色：<b class="c-top">紅</b>是上旋，回球容易出界，輕拉化解；<b class="c-back">青</b>是下旋，容易掛網，輕推化解；<b class="c-side">紫</b>是側旋，回球會往旁邊偏。外圈一半紅一半紫是側上旋。</dd></div>
@@ -1003,6 +1004,8 @@ button { font: inherit; color: inherit; }
       html = '球的顏色：<b class="c-top">紅＝上旋</b>，輕拉化解；<b class="c-back">青＝下旋</b>，輕推化解；<b class="c-side">紫＝側旋</b>';
     } else if (running && !paused && pointsPlayed < 15 && (game.phase === 'rally' || game.phase === 'serve')) {
       html = '<b>先往後拉再往前揮＝拉球</b>，上旋更強；<b>斜著揮＝側上旋</b>；拍子外面一小圈也打得到，但會<b>擦邊</b>';
+    } else if (running && !paused && pointsPlayed < 20 && (game.phase === 'rally' || game.phase === 'serve')) {
+      html = '<b>上旋</b>落台會加速、<b>下旋</b>會變慢；用拍子的<b>左半邊或右半邊</b>打球，會摩擦球的側面帶出<b>側旋</b>';
     }
     if (html !== tipKey) { tipKey = html; $('tip').innerHTML = html; $('tip').hidden = !html; }
     const showServe = running && !paused && game.phase === 'serveWait' && game.server === 'p';

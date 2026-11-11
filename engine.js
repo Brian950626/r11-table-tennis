@@ -4,12 +4,18 @@
   'use strict';
   const G = 9.81, R = 0.02;
   const HX = 0.7625, HZ = 1.37, NET_H = 0.1525, NET_X = HX + 0.1525, FLOOR = -0.76;
-  const SPIN = { none: { e: 0.89, kh: 0.97 }, top: { e: 0.8, kh: 1.04 }, back: { e: 0.7, kh: 0.5 } };
+  // e：落台後往上彈的比例；kh：沒有旋轉的球落台後往前的速度剩多少
+  const SPIN = { none: { e: 0.89, kh: 0.97 }, top: { e: 0.8 }, back: { e: 0.7 } };
   // 旋轉的強度：spinTop +1 是最強上旋、-1 是最強下旋；spinSide +1 往 +x 彎、-1 往 -x 彎。
-  // 落台的反彈係數在 SPIN.none 和 SPIN.top／SPIN.back 之間依強度內插。
+  // 落台往上彈的比例在 SPIN.none 和 SPIN.top／SPIN.back 之間依強度內插。
   const SPINFX = {
-    magTop: 3.2, magBack: 2.4, magSide: 2.6, // 飛行中的額外加速度（m/s²）：上旋往下壓、下旋往上托、側旋往旁邊彎
-    kickSide: 0.55, // 側旋落台後往旁邊多拐的速度（m/s）
+    magTop: 3.2, magBack: 2.4, magSide: 3.2, // 飛行中的額外加速度（m/s²）：上旋往下壓、下旋往上托、側旋往旁邊彎
+    kickSide: 0.7, // 側旋落台後往旁邊多拐的速度（m/s）
+    // 落台時球底和桌面的摩擦：上旋的球底往後轉，桌面把球往前推（加速）；下旋的球底往前轉，桌面把球往後拖（減速）。
+    // 跟真的球一樣，推或拖的速度 = 摩擦係數 × 旋轉強度 × (1 + e) × 落台時往下的速度，所以球砸得越重，效果越明顯。
+    fricTop: 0.26, fricBack: 0.4,
+    minKeep: 0.2, // 下旋再強，落台後往前的速度至少剩這個比例（球不會倒著跑回去）
+    contactSide: 0.9, // 打在球的側面（球偏離拍子中心）時最多帶出多少側旋
     keepTop: 0.5, keepSide: 0.7, // 落台後剩下的旋轉比例
     recvY: 0.6, recvX: 0.45, recvSig: 0.03, // 接球時沒化解掉的來球旋轉讓回球偏掉多少
     smashTop: 1, // 扣殺帶的上旋
@@ -137,7 +143,9 @@
         }
       } else if (tE === tTab) {
         const t = b.spinTop, s = b.spinSide, P = t >= 0 ? SPIN.top : SPIN.back, k = Math.abs(t);
-        const e = SPIN.none.e + (P.e - SPIN.none.e) * k, kh = SPIN.none.kh + (P.kh - SPIN.none.kh) * k;
+        const e = SPIN.none.e + (P.e - SPIN.none.e) * k;
+        const vh = Math.hypot(b.vx, b.vz), dv = t * (t >= 0 ? SPINFX.fricTop : SPINFX.fricBack) * (1 + e) * Math.abs(b.vy);
+        const kh = vh > 1e-6 ? Math.max(vh * SPIN.none.kh + dv, vh * SPINFX.minKeep) / vh : SPIN.none.kh;
         b.y = R; b.vy = -b.vy * e; b.vx = b.vx * kh + SPINFX.kickSide * s; b.vz *= kh;
         setSpin(b, t * SPINFX.keepTop, s * SPINFX.keepSide);
         ev.push({ type: 'bounce', side: b.z > 0 ? 'p' : 'r', x: b.x, z: b.z, speed: Math.hypot(b.vx, b.vz) });
@@ -376,17 +384,17 @@
     if (push > 1.0) {
       type = 'smash';
       const k = clamp((push - 1.0) / 1.6, 0, 1);
-      Tf = 0.36 - 0.07 * k; zt = -1.02 - 0.12 * rng(); top = SPINFX.smashTop; sig += 0.04;
+      Tf = 0.36 - 0.08 * k; zt = -1.02 - 0.12 * rng(); top = SPINFX.smashTop; sig += 0.04;
     } else if (push < -0.8) {
       type = 'drop'; Tf = 0.56; zt = -0.34 - 0.14 * rng(); top = -1;
     } else if (push > 0.35) { // 輕推：上旋
       type = 'loop'; top = 0.45 + 0.45 * clamp((push - 0.35) / 0.65, 0, 1);
-      Tf = 0.5 - 0.05 * clamp(push, 0, 1); zt = -0.8 - 0.35 * rng();
+      Tf = 0.5 - 0.1 * clamp(push, 0, 1); zt = -0.8 - 0.35 * rng();
     } else if (push < -0.3) { // 輕拉：下旋長球
       type = 'chop'; top = -(0.45 + 0.45 * clamp((-push - 0.3) / 0.5, 0, 1));
       Tf = 0.54; zt = -0.7 - 0.38 * rng();
     } else {
-      Tf = 0.5 - 0.05 * clamp(push, 0, 1); zt = -0.72 - 0.4 * rng();
+      Tf = 0.5 - 0.1 * clamp(push, 0, 1); zt = -0.72 - 0.4 * rng();
     }
     // 引拍後往前揮＝拉球：拉得越後面、揮得越快，上旋越強。斜著往前揮，有一部分變成側旋（側上旋）
     const sw = swingPath(p, s);
@@ -396,11 +404,15 @@
       const ang = Math.atan2(sw.lat, sw.back); // 0：直直往前拉；接近 ±90°：幾乎是橫著拉
       type = 'loop'; top = Math.max(top, k * Math.cos(ang)); loopSide = 0.9 * k * Math.sin(ang);
     }
-    // 快速左右揮：側旋，球往揮的方向彎（落點照舊，彎度算在瞄準裡）。
+    // 左右揮：側旋，球往揮的方向彎（落點照舊，彎度算在瞄準裡），揮得越快側旋越強。
     // 往自己右手邊揮是右側旋、往左揮是左側旋；平著橫揮會帶一點上旋，往後拉著橫揮則是側下旋
-    const swipe = Math.sign(side) * 0.9 * clamp((Math.abs(side) - 1.0) / 1.2, 0, 1);
+    const swipe = Math.sign(side) * clamp((Math.abs(side) - 0.8) / 1.4, 0, 1);
     if (swipe !== 0 && type === 'drive') top = Math.max(top, 0.3 * Math.abs(swipe));
-    const w = { top, side: s * clamp(swipe + loopSide, -1, 1) };
+    // 打在球的哪一側：球偏在拍子中心的右邊＝拍子摩擦到球的左側，球往右彎；偏在左邊＝摩擦球的右側，球往左彎。
+    // 拍子動得越快摩擦越多；跟揮拍方向相反的那一側會把側旋抵消，甚至反過來
+    const offC = Math.sign(off) * clamp((Math.abs(off) - 0.25) / 0.6, 0, 1);
+    const contact = SPINFX.contactSide * offC * clamp(Math.hypot(push, side) / 1.2, 0, 1);
+    const w = { top, side: s * clamp(swipe + loopSide + contact, -1, 1) };
     if (d.key === 'easy') sig *= 0.6;
     let xt = 0.42 * off + 0.24 * side + gauss() * sig;
     xt = d.key === 'easy' ? clamp(xt, -0.72, 0.72) : clamp(xt, -1.3, 1.3);

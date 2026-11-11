@@ -6,8 +6,8 @@ const ok = (cond, msg) => { console.log((cond ? '  通過  ' : '  失敗  ') + m
 const f2 = (v) => v.toFixed(2);
 
 // 球從桌面正上方以同樣速度落台，回傳剛彈起的速度和彈起後的最高點
-function bounce(top, side) {
-  const b = { x: 0, y: E.R + 1e-4, z: -0.6, vx: 0, vy: -2.5, vz: -4, spin: 'none', spinTop: top, spinSide: side || 0 };
+function bounce(top, side, vy, vz) {
+  const b = { x: 0, y: E.R + 1e-4, z: -0.6, vx: 0, vy: vy || -2.5, vz: vz || -4, spin: 'none', spinTop: top, spinSide: side || 0 };
   const ev = [];
   let after = null;
   for (let i = 0; i < 4000; i++) {
@@ -38,6 +38,17 @@ ok(Math.abs(top.vz) > Math.abs(flat.vz), `上旋落台後往前衝得比無旋�
 ok(side.vx > 0.3 && flat.vx === 0, `往 +x 的側旋落台後往 +x 拐（橫向 ${f2(side.vx)} m/s）`);
 const half = bounce(-0.5);
 ok(half.apex < flat.apex && half.apex > back.apex, '旋轉越強效果越明顯：半下旋介於無旋轉和強下旋之間');
+// 落台前往前的速度是 4 m/s
+ok(-top.vz > 4.5 && -flat.vz < 4, `上旋落台後比落台前還快（4.00 → ${f2(-top.vz)} m/s），無旋轉只會稍微變慢（${f2(-flat.vz)} m/s）`);
+ok(-back.vz < 3 && -back.vz > 0, `下旋落台後明顯變慢，但不會倒著跑（4.00 → ${f2(-back.vz)} m/s）`);
+const halfTop = bounce(0.5);
+ok(-halfTop.vz > -flat.vz && -halfTop.vz < -top.vz && -half.vz < -flat.vz && -half.vz > -back.vz, '旋轉越強，加速或減速越多');
+const topHard = bounce(1, 0, -4), topSoft = bounce(1, 0, -1.2);
+ok(-topHard.vz > -top.vz && -topSoft.vz < -top.vz, `球砸得越重，上旋往前衝得越多（輕落 ${f2(-topSoft.vz)}、重落 ${f2(-topHard.vz)} m/s）`);
+const backSlow = bounce(-1, 0, -4, -1);
+ok(-backSlow.vz > 0 && -backSlow.vz < 0.5, `很慢的強下旋落台後幾乎停住，但還是往前（${f2(-backSlow.vz)} m/s）`);
+const diag = bounce(1, 0, -2.5, -4), diagX = (() => { const b = { x: 0, y: E.R + 1e-4, z: -0.6, vx: 1, vy: -2.5, vz: -4, spin: 'none', spinTop: 1, spinSide: 0 }, ev = []; E.stepBall(b, 1 / 2000, ev); return b; })();
+ok(Math.abs(diagX.vx / diagX.vz - 1 / -4) < 1e-9 && diag.vx === 0, '上旋加速是順著球前進的方向，斜著飛的球不會被改變方向');
 
 console.log('飛行');
 const lf = landing(0), lt = landing(0.8), lb = landing(-0.8), ls = landing(0, 0.9), lsl = landing(0, -0.9);
@@ -68,7 +79,7 @@ function hitWith(vz, vx, incoming) {
   Object.assign(g.ball, { x: 0, y: 0.25, z: 1.6, vx: 0, vy: -0.5, vz: 4, spinTop: incoming ? incoming.top : 0, spinSide: incoming ? incoming.side : 0 });
   Object.assign(g.pad, { x: 0, z: 1.6, vz, vx, hist: [] });
   E._test.playerHit(g);
-  return { type: g.lastShot.p, top: g.ball.spinTop, side: g.ball.spinSide, vy: g.ball.vy, vx: g.ball.vx };
+  return { type: g.lastShot.p, top: g.ball.spinTop, side: g.ball.spinSide, vy: g.ball.vy, vx: g.ball.vx, speed: Math.hypot(g.ball.vx, g.ball.vz) };
 }
 const hFlat = hitWith(0, 0), hLoop = hitWith(-0.7, 0), hSmash = hitWith(-1.8, 0), hChop = hitWith(0.55, 0), hDrop = hitWith(1.2, 0);
 ok(hFlat.type === 'drive' && hFlat.top === 0 && hFlat.side === 0, '不前後動 → 平擊，沒有旋轉');
@@ -76,9 +87,12 @@ ok(hLoop.type === 'loop' && hLoop.top > 0.4, `輕推 → 上旋（強度 ${f2(hL
 ok(hSmash.type === 'smash' && hSmash.top > 0.4, '用力推 → 扣殺，帶上旋');
 ok(hChop.type === 'chop' && hChop.top < -0.4, `輕拉 → 下旋長球（強度 ${f2(hChop.top)}）`);
 ok(hDrop.type === 'drop' && hDrop.top < -0.4, '用力拉 → 放短，帶下旋');
-const hSmallSide = hitWith(0, 0.6), hSideR = hitWith(0, 2.2), hSideL = hitWith(0, -2.2);
+const hSmallSide = hitWith(0, 0.6), hSideR = hitWith(0, 2.2), hSideL = hitWith(0, -2.2), hSideMid = hitWith(0, 1.4);
 ok(hSmallSide.side === 0, '小幅左右移動只改方向，不帶側旋');
 ok(hSideR.side > 0.5 && hSideL.side < -0.5, '快速往右揮 → 往右彎的側旋；往左揮 → 往左彎');
+ok(hSideMid.side > 0.2 && hSideMid.side < hSideR.side, `揮得越快側旋越強（1.4 m/s：${f2(hSideMid.side)}，2.2 m/s：${f2(hSideR.side)}）`);
+const pSlow = hitWith(-0.4, 0), pFast = hitWith(-0.95, 0), pSmash = hitWith(-1.2, 0), pSmashMax = hitWith(-2.6, 0);
+ok(pFast.speed > pSlow.speed + 0.3 && pSmash.speed > pFast.speed && pSmashMax.speed > pSmash.speed, `推得越快球越快（${f2(pSlow.speed)} → ${f2(pFast.speed)} → 扣殺 ${f2(pSmash.speed)} → ${f2(pSmashMax.speed)} m/s）`);
 
 // 雙人模式的玩家 2 站在另一端：他的右手邊是 -x、往網子是 +z，旋轉也要照他的方向
 function hitWith2(vz, vx) {
@@ -117,6 +131,35 @@ ok(lLeft.top > 0.4 && lLeft.side < -0.4, `從右後往左前斜著揮 → 側上
 const hSideTop = hitWith(0, 2.2), hSideBack = hitWith(0.55, 2.2);
 ok(hSideTop.top > 0.15 && hSideTop.side > 0.5, `平著快速橫揮 → 側旋帶一點上旋（上旋 ${f2(hSideTop.top)}）`);
 ok(hSideBack.top < -0.4 && hSideBack.side > 0.5, `往後輕拉同時快速橫揮 → 側下旋（下旋 ${f2(hSideBack.top)}、側旋 ${f2(hSideBack.side)}）`);
+
+console.log('打在球的哪一側');
+// 球在拍子中心右邊 dx 公尺（負的是左邊）被打到：球偏右＝拍子摩擦到球的左側，偏左＝摩擦到球的右側
+function hitOff(dx, vz, vx) {
+  g.phase = 'rally'; g.hitter = 'r'; g.recvBounced = true;
+  Object.assign(g.ball, { x: dx, y: 0.25, z: 1.6, vx: 0, vy: -0.5, vz: 4, spinTop: 0, spinSide: 0 });
+  Object.assign(g.pad, { x: 0, z: 1.6, vz, vx, hist: [] });
+  E._test.playerHit(g);
+  return { type: g.lastShot.p, top: g.ball.spinTop, side: g.ball.spinSide };
+}
+const RR = E.DIFFS.normal.pReach;
+const oL = hitOff(-0.8 * RR, -0.7, 0), oR = hitOff(0.8 * RR, -0.7, 0), oC = hitOff(0.15 * RR, -0.7, 0), oStill = hitOff(0.8 * RR, 0, 0);
+ok(oL.side < -0.3 && oL.top > 0.4, `往前打在球的右側（球偏在拍子左邊）→ 球往左彎，上旋還在（側旋 ${f2(oL.side)}）`);
+ok(oR.side > 0.3 && Math.abs(oR.side + oL.side) < 1e-9, `打在球的另一側（左側）→ 側旋反過來，球往右彎（${f2(oR.side)}）`);
+ok(oC.side === 0 && oStill.side === 0, '打在球的正後方，或拍子沒有動，都不會帶側旋');
+const oSlowPush = hitOff(0.8 * RR, -0.4, 0);
+ok(oSlowPush.side > 0 && oSlowPush.side < oR.side, `拍子動得越快，摩擦出的側旋越強（${f2(oSlowPush.side)} < ${f2(oR.side)}）`);
+const swNat = hitOff(0.8 * RR, 0, 1.5), swOpp = hitOff(-0.8 * RR, 0, 1.5), swMid = hitOff(0, 0, 1.5);
+ok(swNat.side > swMid.side && swMid.side > 0, `往右揮、順著打在球的左側 → 側旋更強（${f2(swMid.side)} → ${f2(swNat.side)}）`);
+ok(swOpp.side < -0.1, `往右揮卻打在球的右側 → 側旋反過來（${f2(swMid.side)} → ${f2(swOpp.side)}）`);
+const oChop = hitOff(0.8 * RR, 0.55, 0);
+ok(oChop.type === 'chop' && oChop.top < -0.4 && oChop.side > 0.3, `往後拉（削）球的側面 → 側下旋（下旋 ${f2(oChop.top)}、側旋 ${f2(oChop.side)}）`);
+// 玩家 2 的左右是反的：球在 -x 那邊＝在他的拍子右邊
+const x2 = E.createGame('normal', { rng: () => 0.5, mode: 'pvp' });
+x2.phase = 'rally'; x2.hitter = 'p'; x2.recvBounced = true;
+Object.assign(x2.ball, { x: -0.8 * RR, y: 0.25, z: -1.6, vx: 0, vy: -0.5, vz: -4, spinTop: 0, spinSide: 0 });
+Object.assign(x2.pad2, { x: 0, z: -1.6, vz: 0.7, vx: 0, hist: [] });
+E._test.playerHit(x2, 'r');
+ok(x2.ball.spinSide < -0.3, `雙人模式玩家 2 打在球的左側（球在他的拍子右邊）→ 球往他的右手邊（-x）彎（${f2(x2.ball.spinSide)}）`);
 
 console.log('擦邊（球打在拍子邊緣）');
 // 球在拍子右邊 dx 公尺的地方被打到，其他條件跟 hitWith(0, 0) 一樣
