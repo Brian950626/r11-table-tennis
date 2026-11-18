@@ -5,7 +5,7 @@
 ## 指令
 
 - `npm test`：跑全部測試（需要 Node.js 18 以上，不用 `npm install`）
-- 單獨跑：`node rules.test.js`、`node spin.test.js`、`node selfplay.test.js`、`node skins.test.js`、`node records.test.js`
+- 單獨跑：`node rules.test.js`、`node spin.test.js`、`node selfplay.test.js`、`node skins.test.js`、`node records.test.js`、`node online.test.js`
 - 看畫面：用瀏覽器打開 `index.html`，不需要伺服器
 
 ## 檔案分工
@@ -15,8 +15,9 @@
 | `engine.js` | 球的物理、比賽規則、機器人 AI。**不能碰 DOM**，Node 測試會直接 `require` 它 |
 | `records.js` | 成績紀錄、統計、排行榜和 `localStorage` 讀寫（掛在 `window.R11Records`）。**不能碰 DOM**，`records.test.js` 會直接 `require` 它 |
 | `skins.js` | 對手造型（經典、櫻、焰、喵喵、影、靜、颯、眠，動漫風原創角色），只負責畫角色；每個造型的 `style` 是打法，對應 `engine.js` 的 `STYLES` |
-| `index.html` | 畫面繪製、觸控／滑鼠／鍵盤操控、音效、選單、計分板；CSS 和主程式都在這個檔案裡 |
-| `*.test.js` | 規則、旋轉、自動對打、造型、成績紀錄五組測試 |
+| `online.js` | 連線對戰的資料（掛在 `window.R11Online`）：房主的快照、轉成加入者視角、檢查對方送來的資料。**不能碰 DOM 也不碰網路**，`online.test.js` 會直接 `require` 它 |
+| `index.html` | 畫面繪製、觸控／滑鼠／鍵盤操控、音效、選單、計分板、連線（PeerJS）；CSS 和主程式都在這個檔案裡 |
+| `*.test.js` | 規則、旋轉、自動對打、造型、成績紀錄、連線六組測試 |
 | `.github/workflows/test.yml` | push 到 `main` 和每個 Pull Request 都會自動跑 `npm test` |
 
 ## 座標
@@ -26,12 +27,17 @@
 - 玩家擊球的旋轉看兩件事：擊球瞬間拍子的速度，和擊球前 `PAD_HIST` 秒的揮拍路徑（`pad.hist`，`swingPath()` 算出引拍長度 `back` 和橫移 `lat`）。擊球範圍是 `pReach`，再外面 `SPINFX.edgeW` 那一圈算擦邊（`type: 'edge'`）。球偏離拍子中心（`off`）代表打在球的側面，會照 `SPINFX.contactSide` 帶出側旋：球偏右往右彎、偏左往左彎。
 - 擊球時機用 `timingOf(g, ball)` 算：球彈起後快到最高點（最高點前 `SPINFX.sweetLead` 秒）是最佳擊球點，前後 `DIFFS.perfect` 秒內打到是完美（hit 事件的 `perfect`、`timing`）。`g.sweet` 是預測的最佳擊球點，只要設定 `g.hint` 的地方都要一起設。球種名稱（平擊、拉球、側拐、擋球…）在 `index.html` 的 `shotName()`。
 - 落台照真實的摩擦算：上旋加速、下旋減速，增減的速度 = `SPINFX.fricTop`／`fricBack` × 旋轉強度 × (1 + e) × 落台時往下的速度，順著球前進的方向。沒有旋轉的球才用 `SPIN.none.kh`。
+- 連線對戰：建立房間的「房主」跑引擎（`mode: 'pvp'`），自己是 `'p'`，加入的人是 `'r'`（`pad2`）。加入的人不跑 `update`，只套用房主每幀送來的快照（`online.js` 的 `applySnapshot`：x、z 變號，`'p'`、`'r'` 對調），所以在他的畫面上自己也是近端的 `'p'`。
+  - `index.html` 裡 `isPvp()` 是「兩個人對打」（同一台或連線），`isLocalPvp()` 才是「兩人共用這台裝置」（俯視角、分割畫面操控）；視角和操控要用 `isLocalPvp()`。
+  - 改了快照或訊息格式，要把 `online.js` 的 `VERSION` 加 1，兩邊版本不同時會擋下來。
 - `skins.js` 用公分：y 朝下，原點在角色中心線的桌面高度。頭中心約在 y = -66，任何東西都不能畫到 y = -104 以上（會被計分板擋到，`skins.test.js` 會檢查）。
 
 ## 規定
 
 - 不要加框架、建置工具或 npm 套件；真的需要，先開 Issue 討論。
-- 不要用 `<script type="module">` 或 `import`：用 `file://` 打開 `index.html` 時瀏覽器會擋 ES module。照現在的寫法，每個 .js 包成立即執行的函式，在瀏覽器掛到 `window`（`PingPong`、`R11Skins`），在 Node 用 `module.exports`。
+  - 唯一的例外是連線對戰用的 PeerJS（Issue #11 討論後同意）：從 cdnjs 載入、鎖定版本並加 `integrity`，只在按「建立房間」或「加入房間」時才載入。換版本要一起更新 `index.html` 的 `PEER_SRC` 和 `PEER_SRI`。
+- 從另一台裝置收到的資料都不能直接相信：數字要檢查、事件只留認得的欄位（`online.js` 的 `cleanEvent`、`readInput`），顯示文字一律用 `textContent`。
+- 不要用 `<script type="module">` 或 `import`：用 `file://` 打開 `index.html` 時瀏覽器會擋 ES module。照現在的寫法，每個 .js 包成立即執行的函式，在瀏覽器掛到 `window`（`PingPong`、`R11Skins`、`R11Records`、`R11Online`），在 Node 用 `module.exports`。
 - 畫面上的文字一律用繁體中文（台灣用語）。
 - `localStorage` 的讀寫都要包在 `try/catch` 裡，有些瀏覽器會擋。
 - 新動畫要尊重 `prefers-reduced-motion`（`index.html` 的 `reduced`、`skins.js` 的 `st.reduced`）：開啟時停止晃動或改成簡化版。

@@ -566,7 +566,9 @@
     for (let t = 0; t < 3; t += 1 / 240) {
       ev.length = 0; stepBall(s, 1 / 240, ev);
       for (const e of ev) {
+        // a serve bounces once on the server's own side first: skip that bounce
         if (e.type === 'bounce' && e.side === side && !bounced) bounced = true;
+        else if (e.type === 'bounce' && e.side !== side && !bounced) continue;
         else if (e.type !== 'netcord') return null;
       }
       if (bounced && s.vy <= SPINFX.sweetLead * spinAccel(s.spinTop || 0, 0).gy) return { x: s.x, y: s.y, z: s.z };
@@ -675,6 +677,6 @@
     if (pvp) padHeight(g.pad2, b, live && g.hitter === 'p' && b.z < 0, dt);
   }
 
-  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit, nextGame, checkHits, swingPath, timingOf }, BEST_OF, BREAK_SECS, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, predictSweet, timingOf, spinAccel, receiveKick, setRng: (f) => { rng = f; } };
+  const API = { _test: { point, resetForServe, afterPoint, playerHit, robotHit, nextGame, checkHits, swingPath, timingOf }, BEST_OF, BREAK_SECS, G, R, HX, HZ, NET_H, NET_X, FLOOR, PAD, ROB, DIFFS, STYLES, setStyle, SPIN, SPINFX, createGame, update, serve, stepBall, servePlan, aimVelocity, netMargin, predictBounce, predictSweet, timingOf, spinAccel, receiveKick, movePad, setRng: (f) => { rng = f; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.PingPong = API;
 })(this);

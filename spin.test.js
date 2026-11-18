@@ -247,6 +247,11 @@ let tauAt = null;
 for (let i = 0; i < 4000 && tauAt === null; i++) { E.stepBall(fly, 1 / 2000, evs); if (fly.z >= sw2.z) tauAt = E.timingOf(gs, fly).tau; }
 ok(sw2 && sw2.z > 0.9 && sw2.y > 0.05 && Math.abs(tauAt) < 0.01, `準星標的位置就是最佳擊球點（z ${f2(sw2.z)}、高 ${f2(sw2.y)} m，誤差 ${Math.abs(tauAt).toFixed(3)} 秒）`);
 
+// 發球會先彈在發球方自己那邊；準星要跳過那一下，標在接發球這邊
+const gServe = E.createGame("normal", { rng: () => 0.5, first: "r" });
+for (let i = 0; i < 600 && gServe.phase !== "serve"; i++) E.update(gServe, 1 / 60);
+ok(gServe.phase === "serve" && gServe.sweet && gServe.sweet.z > 0.9, `R-11 發球時也會標出最佳擊球點（在你這邊 z ${gServe.sweet ? f2(gServe.sweet.z) : "沒有"}）`);
+
 console.log('擋球');
 const bFast = hitTimed(-1.5, { pvz: 0, vz: 7 }), bSlow = hitTimed(-1.5, { pvz: 0, vz: 4 }), bMove = hitTimed(-1.5, { pvz: -0.7, vz: 7 });
 ok(bFast.e.type === 'block', '拍子不動、來球很快 → 擋球');
