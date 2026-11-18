@@ -178,8 +178,20 @@ button { font: inherit; color: inherit; }
 .end-rec > span { display: grid; justify-items: center; }
 .rec-link { border: 0; background: none; padding: 6px 2px; color: var(--accent); font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 /* two-player mode: .game.pvp swaps the cpu-only / pvp-only pieces; player 2 is teal */
-.diffs.modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.game.pvp .cpu-only, .game:not(.pvp) .pvp-only { display: none !important; }
+.diffs.modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.game.pvp .cpu-only, .game:not(.pvp):not(.online) .pvp-only, .game.online .pvp-only:not(.net), .game.online .no-net, .game:not(.online) .online-only { display: none !important; }
+/* online (two devices): .game.online shows the cpu-style pieces plus the .net ones; the lobby replaces 開始比賽 */
+.lobby { display: grid; gap: 12px; }
+.join-row { display: flex; gap: 8px; }
+.join-row input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 16px; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 11px; user-select: text; -webkit-user-select: text; }
+.join-row input#joinCode { font-family: var(--f-num); font-size: 22px; font-weight: 700; letter-spacing: 0.3em; text-align: center; }
+.join-row button { flex: none; padding-inline: 18px; }
+.room-code { margin: 0; font-family: var(--f-num); font-weight: 800; font-size: 46px; letter-spacing: 0.22em; color: var(--accent); text-align: center; line-height: 1.1; }
+.lobby-status { margin: 0; min-height: 1.5em; font-size: 14px; font-weight: 700; line-height: 1.5; color: var(--teal); text-align: center; }
+.lobby-status.err { color: var(--coral); }
+.lobby-note { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.net-note { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.5; color: var(--coral); }
+.primary:disabled { opacity: 0.5; cursor: default; }
 .banner.p2 .main, .callout.p2 { color: var(--teal); }
 /* portrait two-player (.vert): players face each other across the phone. The score sits beside the net,
    player 2's half of everything is turned 180° so it reads upright from the far end. */
@@ -235,31 +247,53 @@ button { font: inherit; color: inherit; }
         <p class="kicker">TABLE TENNIS · 11 POINTS</p>
         <button class="rec-open" id="bRecords" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="8" width="3.6" height="7" rx="1"/><rect x="6.2" y="4" width="3.6" height="11" rx="1"/><rect x="11.4" y="1" width="3.6" height="14" rx="1"/></svg>成績</button>
       </div>
-      <h1 class="cpu-only">對手：<span class="num">R-11</span></h1>
+      <h1 class="cpu-only no-net">對手：<span class="num">R-11</span></h1>
       <h1 class="pvp-only">雙人對戰</h1>
-      <p class="lede cpu-only">一局 11 分。移動球拍接球，擊球那一下怎麼動，球就怎麼飛。</p>
+      <h1 class="online-only">連線對戰</h1>
+      <p class="lede online-only">兩支手機各自玩、連線對打。一個人建立房間，另一個人輸入房號加入；球速和局數由建立房間的人決定。</p>
+      <p class="lede cpu-only no-net">一局 11 分。移動球拍接球，擊球那一下怎麼動，球就怎麼飛。</p>
       <p class="lede pvp-only">每局 11 分，可以打一局、三戰兩勝或五戰三勝。兩個人在同一支手機或同一台電腦上對打，各自控制一支球拍。</p>
       <p class="label">模式</p>
       <div class="diffs modes" id="modes" role="group" aria-label="模式">
         <button type="button" data-mode="cpu" aria-pressed="true"><b>對戰 R-11</b><small>一個人跟 R-11 打</small></button>
-        <button type="button" data-mode="pvp" aria-pressed="false"><b>雙人對戰</b><small>兩個人用同一台裝置對打</small></button>
+        <button type="button" data-mode="pvp" aria-pressed="false"><b>雙人對戰</b><small>兩人同一台裝置</small></button>
+        <button type="button" data-mode="online" aria-pressed="false"><b>連線對戰</b><small>兩支手機連線</small></button>
       </div>
-      <p class="label"><span class="cpu-only">難度</span><span class="pvp-only">球速</span></p>
+      <p class="label"><span class="cpu-only no-net">難度</span><span class="pvp-only net">球速</span></p>
       <div class="diffs" id="diffs" role="group" aria-label="難度">
         <button type="button" id="dEasy" data-diff="easy" aria-pressed="false"><b>簡單</b><small>球速慢，會標出落點</small></button>
-        <button type="button" id="dNormal" data-diff="normal" aria-pressed="true"><b>普通</b><small class="cpu-only">會打你的反手角落</small><small class="pvp-only">標準球速</small></button>
-        <button type="button" id="dHard" data-diff="hard" aria-pressed="false"><b>困難</b><small class="cpu-only">球速快，會扣殺和放短</small><small class="pvp-only">球速快，要反應更快</small></button>
+        <button type="button" id="dNormal" data-diff="normal" aria-pressed="true"><b>普通</b><small class="cpu-only no-net">會打你的反手角落</small><small class="pvp-only net">標準球速</small></button>
+        <button type="button" id="dHard" data-diff="hard" aria-pressed="false"><b>困難</b><small class="cpu-only no-net">球速快，會扣殺和放短</small><small class="pvp-only net">球速快，要反應更快</small></button>
       </div>
-      <p class="label pvp-only">局數</p>
-      <div class="diffs pvp-only" id="bestOfs" role="group" aria-label="局數">
+      <p class="label pvp-only net">局數</p>
+      <div class="diffs pvp-only net" id="bestOfs" role="group" aria-label="局數">
         <button type="button" data-best="1" aria-pressed="true"><b>一局</b><small>先拿 11 分</small></button>
         <button type="button" data-best="3" aria-pressed="false"><b>三戰兩勝</b><small>先贏 2 局</small></button>
         <button type="button" data-best="5" aria-pressed="false"><b>五戰三勝</b><small>先贏 3 局</small></button>
       </div>
-      <p class="label cpu-only">對手造型</p>
+      <p class="label cpu-only no-net">對手造型</p>
+      <p class="label online-only">你的造型（對方畫面上的你）</p>
       <div class="skins cpu-only" id="skinsMenu" role="group" aria-label="對手造型"></div>
       <p class="skin-desc cpu-only" id="skinDescMenu"></p>
-      <button class="primary" id="bStart" type="button">開始比賽</button>
+      <button class="primary no-net" id="bStart" type="button">開始比賽</button>
+      <div class="lobby online-only" id="lobby">
+        <div class="lobby" id="lobbyStart">
+          <button class="primary" id="bHost" type="button">建立房間</button>
+          <div class="join-row">
+            <input id="joinCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="go" placeholder="房號" aria-label="要加入的 4 位數房號">
+            <button class="secondary" id="bJoin" type="button">加入房間</button>
+          </div>
+        </div>
+        <div class="lobby" id="lobbyRoom" hidden>
+          <p class="label">房號</p>
+          <p class="room-code" id="roomCode">----</p>
+          <p class="lobby-note">把房號告訴對方，請他在「連線對戰」輸入房號加入；也可以把連結傳給他。</p>
+          <div class="join-row" id="linkRow"><input id="roomLink" type="text" readonly aria-label="邀請連結"><button class="secondary" id="bCopyLink" type="button">複製連結</button></div>
+        </div>
+        <p class="lobby-status" id="lobbyStatus" role="status"></p>
+        <button class="secondary" id="bLeave" type="button" hidden>取消</button>
+        <p class="lobby-note">用免費的 PeerJS 服務幫兩支手機配對，之後手機直接互傳球和球拍的位置，不用登入、不存任何資料。同一個 Wi-Fi 最順；有些行動網路可能比較慢或連不上。</p>
+      </div>
       <div class="toggles">
       <label class="sound"><input type="checkbox" id="snd1" checked> 音效</label>
       <label class="sound"><input type="checkbox" id="vib1"> 震動</label>
@@ -295,12 +329,13 @@ button { font: inherit; color: inherit; }
     <div class="card">
       <h2>暫停</h2>
       <p class="lede" id="pauseScore"></p>
-      <p class="label cpu-only">對手造型</p>
-      <div class="skins cpu-only" id="skinsPause" role="group" aria-label="對手造型"></div>
-      <p class="skin-desc cpu-only" id="skinDescPause"></p>
+      <p class="net-note" id="pauseNet" hidden></p>
+      <p class="label cpu-only no-net">對手造型</p>
+      <div class="skins cpu-only no-net" id="skinsPause" role="group" aria-label="對手造型"></div>
+      <p class="skin-desc cpu-only no-net" id="skinDescPause"></p>
       <button class="primary" id="bResume" type="button">繼續</button>
       <div class="row">
-        <button class="secondary" id="bRestart" type="button">重新開始</button>
+        <button class="secondary no-net" id="bRestart" type="button">重新開始</button>
         <button class="secondary" id="bMenu" type="button">回選單</button>
       </div>
       <div class="toggles">
@@ -371,6 +406,7 @@ button { font: inherit; color: inherit; }
 <script src="engine.js"></script>
 <script src="skins.js"></script>
 <script src="records.js"></script>
+<script src="online.js"></script>
 <script>
 (function () {
   'use strict';
@@ -393,16 +429,29 @@ button { font: inherit; color: inherit; }
   // vibration starts off for reduced-motion users; a saved choice wins either way
   let vibeOn = !reduced;
   try { const v = localStorage.getItem('r11-vibe'); if (v === '1' || v === '0') vibeOn = v === '1'; } catch (e) { /* storage unavailable */ }
-  // mode: 'cpu' = vs R-11, 'pvp' = two players on one device ('r' side becomes player 2)
+  // mode: 'cpu' = vs R-11, 'pvp' = two players on one device ('r' side becomes player 2), 'online' = two devices
   let modeKey = 'cpu', pvpFirst = 'p';
-  try { if (localStorage.getItem('r11-mode') === 'pvp') modeKey = 'pvp'; } catch (e) { /* storage unavailable */ }
+  try { const mk = localStorage.getItem('r11-mode'); if (mk === 'pvp' || mk === 'online') modeKey = mk; } catch (e) { /* storage unavailable */ }
+  // an invite link (?room=1234) opens the online lobby with the room number filled in
+  let roomParam = '';
+  try { const c = new URLSearchParams(location.search).get('room'); if (c && /^\d{4}$/.test(c)) { roomParam = c; modeKey = 'online'; } } catch (e) { /* ignore */ }
+  // the engine mode behind the menu: online play only becomes a two-player game once both devices are connected
+  const menuMode = () => (modeKey === 'pvp' ? 'pvp' : 'cpu');
   // two-player match length: 1 game, best of 3 or best of 5
   let bestOf = 1;
   try { const v = Number(localStorage.getItem('r11-bestof')); if (E.BEST_OF.includes(v)) bestOf = v; } catch (e) { /* storage unavailable */ }
   const currentSkin = () => SK.byId[skinId] || SK.list[0];
-  let game = E.createGame(diffKey, { mode: modeKey }), running = false, paused = false, pointsPlayed = 0, lastPointer = coarse ? 'touch' : 'mouse';
+  let game = E.createGame(diffKey, { mode: menuMode() }), running = false, paused = false, pointsPlayed = 0, lastPointer = coarse ? 'touch' : 'mouse';
   const input = { tx: 0, tz: PAD.restZ };
   const keys = new Set();
+  // online session (see "online" below). role: null = not in a room, 'host' = created the room (runs the engine, plays 'p'),
+  // 'join' = joined it (plays 'r' on the host, but sees itself at the near end as 'p')
+  const net = { role: null, peer: null, conn: null, code: '', state: 'idle', remote: { tx: 0, tz: -PAD.restZ }, oppSkin: '', diff: 'normal', bestOf: 1,
+    out: [], rtt: 0, lastMsg: 0, lostAt: 0, retryAt: 0, psHold: 0, dialAt: 0, fresh: false };
+  // two players sharing this one device (top-down camera, split-screen controls); online play uses the normal view
+  const isLocalPvp = () => game.mode === 'pvp' && !net.role;
+  // who is drawn at the far end: online it is the opponent's chosen character
+  const oppSkin = () => (net.role && SK.byId[net.oppSkin]) || currentSkin();
 
   // ---------------- camera ----------------
   // camera: low and flat on wide screens, higher and steeper on tall phone screens
@@ -441,7 +490,7 @@ button { font: inherit; color: inherit; }
     f = f0 * cam.y;
   }
   function fitCamera() {
-    const pvp = game.mode === 'pvp';
+    const pvp = isLocalPvp();
     gameEl.classList.toggle('vert', pvp && !(W > H * 1.05)); gameEl.classList.toggle('horiz', pvp && W > H * 1.05);
     if (pvp) { fitTopCamera(); return; }
     cam.rot = false; cam.x = 0;
@@ -619,7 +668,7 @@ button { font: inherit; color: inherit; }
   function robotAnchor() { const r = game.robot; return { x: r.x * 0.75 - 0.24, z: Math.min(r.z - 0.38, -1.62) }; }
   // the robot's body is drawn as a flat sprite in the skin's local frame (cm, y down, origin at table height)
   function drawRobotBody(now) {
-    const r = game.robot, A = robotAnchor(), skin = currentSkin();
+    const r = game.robot, A = robotAnchor(), skin = oppSkin();
     const O = proj(A.x, 0, A.z), U = proj(A.x, 1, A.z);
     const sx = O.s / 100, sy = (O.y - U.y) / 100;
     const bob = reduced ? 0 : Math.sin(now / 430) * 0.8;
@@ -656,7 +705,7 @@ button { font: inherit; color: inherit; }
   }
 
   function drawRobotArm() {
-    const r = game.robot, A = robotAnchor(), side = r.x >= A.x ? 1 : -1, arm = currentSkin().arm;
+    const r = game.robot, A = robotAnchor(), side = r.x >= A.x ? 1 : -1, arm = oppSkin().arm;
     const shx = (arm.shoulderX || 27) / 100, w = (arm.width || 6.5) / 100;
     const sh = proj(A.x + side * shx, 0.36, A.z);
     const hand = { x: r.x - side * 0.05, y: r.y - 0.11, z: r.z };
@@ -676,10 +725,10 @@ button { font: inherit; color: inherit; }
   function drawShadow() {
     const b = game.ball;
     const onTable = Math.abs(b.x) <= HX && Math.abs(b.z) <= HZ && b.y >= -0.005;
-    if (isPvp() && !onTable) return; // from above, a floor shadow would look like it sits on the table end
+    if (isLocalPvp() && !onTable) return; // from above, a floor shadow would look like it sits on the table end
     const sy = onTable ? 0.002 : FLOOR + 0.002, h = Math.max(0, b.y - sy);
     // seen from above the shadow is the height cue: light from the -x side pushes it out as the ball rises
-    groundEllipse(ctx, b.x + (isPvp() ? h * 0.3 : 0), sy, b.z, 0.026 * (1 + h * 0.9));
+    groundEllipse(ctx, b.x + (isLocalPvp() ? h * 0.3 : 0), sy, b.z, 0.026 * (1 + h * 0.9));
     ctx.fillStyle = `rgba(0,0,0,${(0.5 * Math.max(0.18, 1 - h / 1.4)).toFixed(3)})`; ctx.fill();
   }
   // 旋轉的顏色：上旋紅、下旋青、側旋紫（球的外圈、花紋和軌跡都用這個顏色）
@@ -734,7 +783,7 @@ button { font: inherit; color: inherit; }
         ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
       }
     }
-    const pvp = isPvp(), P = proj(b.x, b.y, b.z), rad = Math.max(2.6, 0.03 * P.s) * (pvp ? 1.15 + 0.9 * Math.max(0, b.y) : 1);
+    const pvp = isLocalPvp(), P = proj(b.x, b.y, b.z), rad = Math.max(2.6, 0.03 * P.s) * (pvp ? 1.15 + 0.9 * Math.max(0, b.y) : 1);
     const toP2 = pvp && game.hitter === 'p' && b.z < 0; // two-player: player 2 gets the smash ring too
     const chance = game.phase === 'rally' && (game.hitter === 'r' && b.z > 0 || toP2) && game.recvBounced && b.y > 0.27;
     if (chance) {
@@ -775,8 +824,8 @@ button { font: inherit; color: inherit; }
   function drawGuides(now) {
     const g = game;
     // serve aim: predicted path of the serve
-    const col = isPvp() && g.server === 'r' ? '62,230,207' : '255,182,39';
-    if (running && g.phase === 'serveWait' && (g.server === 'p' || isPvp())) {
+    const col = isLocalPvp() && g.server === 'r' ? '62,230,207' : '255,182,39';
+    if (running && g.phase === 'serveWait' && (g.server === 'p' || isLocalPvp())) {
       const b = g.ball, plan = E.servePlan(b.x, b.z, g.aim.x, g.aim.z);
       if (plan) {
         const s = { x: b.x, y: plan.y0, z: b.z, vx: plan.v.vx, vy: plan.v.vy, vz: plan.v.vz, spin: 'none' }, ev = [];
@@ -794,16 +843,16 @@ button { font: inherit; color: inherit; }
       }
     }
     // easy mode: where the robot's ball will land (two-player: where the ball lands for whoever receives)
-    if (g.diff.hint && g.hint && (g.hitter === 'r' || isPvp()) && !g.recvBounced && (g.phase === 'rally' || g.phase === 'serve')) {
-      ctx.setLineDash([4, 4]); ctx.strokeStyle = isPvp() && g.hitter === 'p' ? 'rgba(62,230,207,0.85)' : 'rgba(255,182,39,0.85)'; ctx.lineWidth = 1.6;
+    if (g.diff.hint && g.hint && (g.hitter === 'r' || isLocalPvp()) && !g.recvBounced && (g.phase === 'rally' || g.phase === 'serve')) {
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = isLocalPvp() && g.hitter === 'p' ? 'rgba(62,230,207,0.85)' : 'rgba(255,182,39,0.85)'; ctx.lineWidth = 1.6;
       groundEllipse(ctx, g.hint.x, 0.002, g.hint.z, 0.06); ctx.stroke(); ctx.setLineDash([]);
     }
     // easy / normal: the sweet spot, a crosshair in the air where the ball is about to reach the top of its bounce.
     // Meeting the ball there is perfect timing. Hidden once the ball has gone past it or clipped the net.
     const sw = g.sweet;
-    if (g.diff.sweet && sw && (g.hitter === 'r' || isPvp()) && !g.netTouched && (g.phase === 'rally' || g.phase === 'serve') && (g.ball.z - sw.z) * Math.sign(sw.z) < 0.1) {
+    if (g.diff.sweet && sw && (g.hitter === 'r' || isLocalPvp()) && !g.netTouched && (g.phase === 'rally' || g.phase === 'serve') && (g.ball.z - sw.z) * Math.sign(sw.z) < 0.1) {
       const P = proj(sw.x, sw.y, sw.z), rad = Math.max(6, 0.055 * P.s) * (reduced ? 1 : 1 + 0.08 * Math.sin(now / 120));
-      const c = isPvp() && g.hitter === 'p' ? '62,230,207' : '255,214,102';
+      const c = isLocalPvp() && g.hitter === 'p' ? '62,230,207' : '255,214,102';
       ctx.strokeStyle = `rgba(${c},0.9)`; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.arc(P.x, P.y, rad, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath();
@@ -840,12 +889,12 @@ button { font: inherit; color: inherit; }
     if (shake > 0 && !reduced) { ctx.translate((Math.random() - 0.5) * 6 * shake, (Math.random() - 0.5) * 6 * shake); shake = Math.max(0, shake - dt * 4); }
     netFlash = Math.max(0, netFlash - dt * 2.5);
     ctx.drawImage(layers.bg, 0, 0, W, H);
-    if (!isPvp()) drawRobotBody(now);
+    if (!isLocalPvp()) drawRobotBody(now);
     ctx.drawImage(layers.table, 0, 0, W, H);
     drawGuides(now);
     drawShadow();
     // two-player (seen from above): no robot; whatever is higher is drawn on top
-    const items = isPvp() ? [
+    const items = isLocalPvp() ? [
       { z: NET_H * 0.5, d: drawNetLayer },
       { z: game.pad.y, d: () => drawPaddleTop(game.pad, 'p') },
       { z: game.pad2.y, d: () => drawPaddleTop(game.pad2, 'r') },
@@ -1003,7 +1052,9 @@ button { font: inherit; color: inherit; }
   }
   function setServer(s) { $('srvP').classList.toggle('on', s === 'p'); $('srvR').classList.toggle('on', s === 'r'); }
   const isPvp = () => game.mode === 'pvp';
-  const nameOf = (s) => (isPvp() ? (s === 'p' ? '玩家 1' : '玩家 2') : s === 'p' ? '你' : 'R-11');
+  const nameOf = (s) => (net.role ? (s === 'p' ? '你' : '對手') : isPvp() ? (s === 'p' ? '玩家 1' : '玩家 2') : s === 'p' ? '你' : 'R-11');
+  // a name followed by text: "R-11 沒接到" and "玩家 1 先發球" keep the space, "對手沒接到" does not
+  const nameSp = (s) => { const n = nameOf(s); return /[A-Za-z0-9]$/.test(n) ? n + ' ' : n; };
   const toneOf = (s) => (s === 'p' ? 'good' : 'p2');
   const BEST_NAME = { 1: '一局', 3: '三戰兩勝', 5: '五戰三勝' };
   const gamesToWin = () => Math.floor(game.match.bestOf / 2) + 1;
@@ -1032,19 +1083,20 @@ button { font: inherit; color: inherit; }
     $('scP').textContent = game.score.p; $('scR').textContent = game.score.r;
     renderGames();
     $('status').textContent = ''; $('rally').textContent = ''; setServer(game.server);
-    $('diffTag').textContent = isPvp() ? `雙人 · ${game.diff.name}` : game.diff.name;
-    const pvp = isPvp();
+    const pvp = isPvp(), on = !!net.role;
+    $('diffTag').textContent = on ? netTag() : pvp ? `雙人 · ${game.diff.name}` : game.diff.name;
     $('whoP').textContent = $('endWhoP').textContent = nameOf('p');
     $('whoR').textContent = $('endWhoR').textContent = nameOf('r');
-    $('stSmashL').textContent = pvp ? '玩家 1 擊球數' : '扣殺得分';
-    $('stHitsL').textContent = pvp ? '玩家 2 擊球數' : '完美擊球';
-    $('bChange').textContent = pvp ? '換模式或球速' : '換難度或造型';
-    cv.setAttribute('aria-label', pvp ? '桌球場：雙人對戰，玩家 1 和玩家 2 各在球桌一端' : '桌球場：你在近端，對手 R-11 在遠端');
+    $('stSmashL').textContent = on ? '你的擊球數' : pvp ? '玩家 1 擊球數' : '扣殺得分';
+    $('stHitsL').textContent = on ? '對手擊球數' : pvp ? '玩家 2 擊球數' : '完美擊球';
+    $('bChange').textContent = on ? '離開房間' : pvp ? '換模式或球速' : '換難度或造型';
+    $('bMenu').textContent = on ? '離開房間' : '回選單';
+    cv.setAttribute('aria-label', on ? '桌球場：連線對戰，你在近端，對手在遠端' : pvp ? '桌球場：雙人對戰，玩家 1 和玩家 2 各在球桌一端' : '桌球場：你在近端，對手 R-11 在遠端');
   }
   let tipKey = '';
   function updateTip() {
     let html = '';
-    if (isPvp()) {
+    if (isLocalPvp()) {
       // two-player: only the serve tip, for whoever serves, in their own half
       const srv = running && !paused && game.phase === 'serveWait';
       if (srv && pointsPlayed < 4) {
@@ -1081,15 +1133,16 @@ button { font: inherit; color: inherit; }
     if ($('rally').textContent !== rt) $('rally').textContent = rt;
   }
 
-  const WHY_P = { miss: 'R-11 沒接到', out: 'R-11 打出界', net: 'R-11 掛網', double: 'R-11 沒接到短球', ownSide: 'R-11 失誤', serveFault: 'R-11 發球失誤' };
+  const WHY_P = (reason) => { const R = nameSp('r'); return { miss: `${R}沒接到`, out: `${R}打出界`, net: `${R}掛網`, double: `${R}沒接到短球`, ownSide: `${R}失誤`, serveFault: `${R}發球失誤` }[reason]; };
   const WHY_R = { miss: '這球沒接到', out: '出界了', net: '掛網了', double: '短球彈了兩次，要往前接', ownSide: '球打到自己這邊', serveFault: '發球失誤' };
   function onPoint(e) {
     pointsPlayed++;
     flipScore(e.winner, game.score[e.winner]);
     if (e.reason === 'out') Sound.out();
-    Sound.point(e.winner === 'p' || isPvp(), e.reason === 'out' ? 0.2 : 0);
-    buzz(e.winner === 'p' || isPvp() ? BUZZ.point : BUZZ.lose);
-    if (isPvp()) {
+    Sound.point(e.winner === 'p' || isLocalPvp(), e.reason === 'out' ? 0.2 : 0);
+    buzz(e.winner === 'p' || isLocalPvp() ? BUZZ.point : BUZZ.lose);
+    if (net.role === 'join') { game.robot.mood = e.winner === 'r' ? 'happy' : 'sad'; game.robot.moodT = 1.9; }
+    if (isLocalPvp()) {
       const W = nameOf(e.winner), L = nameOf(e.winner === 'p' ? 'r' : 'p');
       const why = { miss: `${L} 沒接到`, out: `${L} 打出界`, net: `${L} 掛網`, double: `${L} 沒接到短球`, ownSide: `${L} 失誤`, serveFault: `${L} 發球失誤` };
       const won = e.hitter === e.winner && (e.reason === 'miss' || e.reason === 'double');
@@ -1098,21 +1151,25 @@ button { font: inherit; color: inherit; }
       banner(main, why[e.reason], toneOf(e.winner));
       return;
     }
+    // online matches can be best of 3 or 5, so a won game gets its own banner
+    const multi = game.match.bestOf > 1, R = nameSp('r');
+    if (e.gameOver) renderGames();
     if (e.winner === 'p') {
-      const main = e.hitter === 'p' && e.shot === 'smash' && (e.reason === 'miss' || e.reason === 'double') ? '扣殺得分！'
+      const main = net.role && e.over ? (multi ? '你贏得比賽！' : '你贏了這局！') : multi && e.gameOver ? `你拿下第 ${e.gameNo} 局`
+        : e.hitter === 'p' && e.shot === 'smash' && (e.reason === 'miss' || e.reason === 'double') ? '扣殺得分！'
         : e.hitter === 'p' && e.shot === 'drop' && (e.reason === 'miss' || e.reason === 'double') ? '放短得分！' : '得分！';
-      banner(main, WHY_P[e.reason], 'good');
+      banner(main, WHY_P(e.reason), 'good');
     } else {
-      const sub = e.hitter === 'r' && e.shot === 'smash' && e.reason === 'miss' ? 'R-11 扣殺' : WHY_R[e.reason];
-      banner(e.over ? '輸了這局' : '失分', sub, 'bad');
+      const sub = e.hitter === 'r' && e.shot === 'smash' && e.reason === 'miss' ? `${R}扣殺` : WHY_R[e.reason];
+      banner(e.over ? (multi ? `${R}贏得比賽` : '輸了這局') : multi && e.gameOver ? `${R}拿下第 ${e.gameNo} 局` : '失分', sub, 'bad');
     }
   }
   // 多局制：一局打完、休息後自動開下一局
   function onGameEnd(e) {
     renderGames();
-    const next = nameOf(game.first === 'p' ? 'r' : 'p');
+    const next = nameSp(game.first === 'p' ? 'r' : 'p');
     queued = null;
-    banner(`第 ${e.gameNo} 局 ${nameOf(e.winner)} 勝`, `${e.last.p}:${e.last.r}　局數 ${e.games.p}:${e.games.r}　下一局 ${next} 先發球`, toneOf(e.winner), Math.round(E.BREAK_SECS * 1000) - 300);
+    banner(`第 ${e.gameNo} 局 ${nameSp(e.winner)}勝`, `${e.last.p}:${e.last.r}　局數 ${e.games.p}:${e.games.r}　下一局 ${next}先發球`, toneOf(e.winner), Math.round(E.BREAK_SECS * 1000) - 300);
   }
   function onServeReady(e) {
     setServer(e.server);
@@ -1120,23 +1177,23 @@ button { font: inherit; color: inherit; }
     if (e.initial && game.match.gameNo > 1) { // 新的一局
       resetHud(); queued = null;
       const m = game.match, decider = m.games.p === gamesToWin() - 1 && m.games.r === gamesToWin() - 1;
-      banner(decider ? `決勝局！第 ${m.gameNo} 局` : `第 ${m.gameNo} 局開始`, `局數 ${m.games.p}:${m.games.r}　${nameOf(e.server)} 先發球`, '', 1500);
+      banner(decider ? `決勝局！第 ${m.gameNo} 局` : `第 ${m.gameNo} 局開始`, `局數 ${m.games.p}:${m.games.r}　${nameSp(e.server)}先發球`, '', 1500);
       return;
     }
-    const gp2 = isPvp() && e.gamePoint ? nameOf(e.gamePoint) : '';
-    const st = e.deuce ? 'Deuce 平分' : gp2 ? `${gp2} ${pointName(e.gamePoint)}` : e.gamePoint === 'p' ? '你的賽末點' : e.gamePoint === 'r' ? 'R-11 賽末點' : '';
+    const gp2 = isLocalPvp() && e.gamePoint ? nameOf(e.gamePoint) : '';
+    const st = e.deuce ? 'Deuce 平分' : gp2 ? `${gp2} ${pointName(e.gamePoint)}` : e.gamePoint === 'p' ? `你的${pointName('p')}` : e.gamePoint === 'r' ? `${nameSp('r')}${pointName('r')}` : '';
     $('status').textContent = st;
     if (e.deuce && !e.initial) Sound.deuce();
-    if (!e.initial && st) queued = [st, e.deuce ? '要連拿 2 分才能贏' : gp2 ? (pointName(e.gamePoint) === '局末點' ? `${gp2} 再拿 1 分就拿下這局` : `${gp2} 再拿 1 分就贏了`) : e.gamePoint === 'p' ? '再拿 1 分就贏了' : '守住這一分', 'neutral', 1200];
+    if (!e.initial && st) queued = [st, e.deuce ? '要連拿 2 分才能贏' : gp2 ? (pointName(e.gamePoint) === '局末點' ? `${gp2} 再拿 1 分就拿下這局` : `${gp2} 再拿 1 分就贏了`) : e.gamePoint === 'p' ? (pointName('p') === '局末點' ? '再拿 1 分就拿下這局' : '再拿 1 分就贏了') : '守住這一分', 'neutral', 1200];
     // the point banner (1.4 s) usually hides before serveReady (dead time 1.55 s), so show it now instead of waiting
     if (queued && $('banner').hidden) { const q = queued; queued = null; banner(q[0], q[1], q[2], q[3]); }
   }
   function onGameOver(e) {
     const win = e.winner === 'p';
-    Sound.end(win || isPvp()); // 雙人對戰總有一個人贏，都放勝利音效
-    if (win || isPvp()) buzz(BUZZ.win);
+    Sound.end(win || isLocalPvp()); // 同一台裝置的雙人對戰總有一個人贏，都放勝利音效
+    if (win || isLocalPvp()) buzz(BUZZ.win);
     setTimeout(() => {
-      $('bAgain').textContent = isPvp() && game.match.bestOf > 1 ? '再來一場' : '再來一局';
+      $('bAgain').textContent = net.role || (isPvp() && game.match.bestOf > 1) ? '再來一場' : '再來一局';
       $('endKicker').textContent = `${game.diff.name} · GAME`;
       $('endTitle').textContent = win ? '你贏了！' : 'R-11 獲勝';
       $('endP').textContent = game.score.p; $('endR').textContent = game.score.r;
@@ -1144,7 +1201,14 @@ button { font: inherit; color: inherit; }
       $('endNote').textContent = win
         ? (game.diff.key === 'hard' ? '連困難的 R-11 都擋不住你。' : '可以挑戰更高的難度了。')
         : '多用左右移動把球打到 R-11 的兩邊，等高球再扣殺。';
-      if (isPvp()) {
+      if (isPvp() && net.role) {
+        const m = game.match, multi = m.bestOf > 1;
+        $('endKicker').textContent = multi ? `連線對戰 · ${BEST_NAME[m.bestOf]} · ${game.diff.name}` : `連線對戰 · ${game.diff.name}`;
+        $('endTitle').textContent = win ? (multi ? '你贏得比賽！' : '你贏了！') : multi ? '對手贏得比賽' : '對手獲勝';
+        if (multi) { $('endP').textContent = m.games.p; $('endR').textContent = m.games.r; }
+        $('stSmash').textContent = game.totalHits.p; $('stHits').textContent = game.totalHits.r;
+        $('endNote').textContent = (multi ? `各局：${m.history.map((h) => `${h.p}:${h.r}`).join('、')}。` : '') + '任一方按「再來一場」就開始下一場，換另一個人先發球。';
+      } else if (isPvp()) {
         const m = game.match, multi = m.bestOf > 1, nextFirst = nameOf(pvpFirst === 'p' ? 'r' : 'p');
         $('endKicker').textContent = multi ? `雙人對戰 · ${BEST_NAME[m.bestOf]} · ${game.diff.name}` : `雙人對戰 · ${game.diff.name}`;
         $('endTitle').textContent = multi ? `${nameOf(e.winner)} 贏得比賽！` : `${nameOf(e.winner)} 獲勝！`;
@@ -1164,7 +1228,7 @@ button { font: inherit; color: inherit; }
         case 'hit': {
           const b = game.ball;
           Sound.hit(e.type, pan(e.x), e.speed, e.who);
-          const human = e.who === 'p' || isPvp(), pvp = isPvp();
+          const human = e.who === 'p' || isLocalPvp(), pvp = isLocalPvp();
           if (human) buzz(e.perfect ? BUZZ.perfect : BUZZ[e.type]);
           if (e.perfect) { Sound.perfect(pan(e.x)); sparks(b.x, b.y, b.z, '#fff1b8', 10, 1.3); }
           // an edge hit (ball off the paddle's rim) throws grey wood chips instead of the player's colour
@@ -1178,7 +1242,7 @@ button { font: inherit; color: inherit; }
             if (e.perfect) callout('完美！' + name, 'perfect' + (pvp ? ' ' + toneOf(e.who) : ''), pvp ? e.who : undefined);
             else callout(name + (e.timing === 'early' ? '・太早' : '・太晚'), (big ? '' : 'shot') + col, pvp ? e.who : undefined);
             if (e.type === 'smash') shake = pvp ? 0.8 : 1;
-          } else if (!human && e.type === 'smash') { callout('R-11 扣殺！', 'bad'); shake = 0.6; }
+          } else if (!human && e.type === 'smash') { callout(`${nameSp('r')}扣殺！`, 'bad'); shake = 0.6; }
           break;
         }
         case 'bounce': Sound.bounce(pan(e.x), e.speed, e.z); fx.push({ kind: 'ring', x: e.x, z: e.z, t: 0 }); break;
@@ -1199,7 +1263,12 @@ button { font: inherit; color: inherit; }
   // ---------------- input ----------------
   function clampInput() { input.tx = clamp(input.tx, PAD.xMin, PAD.xMax); input.tz = clamp(input.tz, PAD.zMin, PAD.zMax); }
   // who: 'p' = you / player 1, 'r' = player 2 (two-player mode only)
-  function tryServe(who) { who = who === 'r' ? 'r' : 'p'; if (running && !paused && game.phase === 'serveWait' && game.server === who) { Sound.init(); E.serve(game, who); } }
+  function tryServe(who) {
+    who = who === 'r' ? 'r' : 'p';
+    if (!running || paused || game.phase !== 'serveWait' || game.server !== who) return;
+    Sound.init();
+    if (net.role === 'join') netSend({ t: 'serve' }); else E.serve(game, who); // online: the host's engine serves for us
+  }
   function mouseTo(e) {
     const r = cv.getBoundingClientRect(), p = unproject(e.clientX - r.left, e.clientY - r.top, 0.15);
     if (p) { input.tx = p.x; input.tz = p.z; clampInput(); }
@@ -1246,7 +1315,7 @@ button { font: inherit; color: inherit; }
   let drag = null;
   cv.addEventListener('pointerdown', (e) => {
     lastPointer = e.pointerType === 'mouse' ? 'mouse' : 'touch';
-    if (isPvp()) { pvpDown(e); return; }
+    if (isLocalPvp()) { pvpDown(e); return; }
     if (e.pointerType === 'mouse') { if (e.button === 0) { mouseTo(e); drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t: performance.now(), mouse: true }; } return; }
     if (drag) return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now() };
@@ -1254,7 +1323,7 @@ button { font: inherit; color: inherit; }
     e.preventDefault();
   });
   cv.addEventListener('pointermove', (e) => {
-    if (isPvp()) { pvpMove(e); return; }
+    if (isLocalPvp()) { pvpMove(e); return; }
     if (e.pointerType === 'mouse') { lastPointer = 'mouse'; mouseTo(e); return; }
     if (!drag || drag.id !== e.pointerId) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -1264,7 +1333,7 @@ button { font: inherit; color: inherit; }
     clampInput();
   });
   function endDrag(e) {
-    if (isPvp()) { pvpUp(e); return; }
+    if (isLocalPvp()) { pvpUp(e); return; }
     if (!drag || drag.id !== e.pointerId) return;
     const moved = Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy), quick = performance.now() - drag.t < 400;
     drag = null;
@@ -1280,7 +1349,7 @@ button { font: inherit; color: inherit; }
     if (MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastPointer = 'mouse'; e.preventDefault(); }
     else if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter') && !paused && $('endMenu').hidden) {
       if (document.activeElement && document.activeElement.tagName === 'BUTTON' && e.code !== 'Space') return;
-      tryServe(isPvp() && e.code !== 'Space' ? 'r' : 'p'); e.preventDefault(); // two-player: Space = player 1, Enter = player 2
+      tryServe(isLocalPvp() && e.code !== 'Space' ? 'r' : 'p'); e.preventDefault(); // two-player: Space = player 1, Enter = player 2
     }
     else if (e.code === 'Escape' || e.code === 'KeyP') { if ($('endMenu').hidden) (paused ? resume() : pause()); }
   });
@@ -1289,7 +1358,7 @@ button { font: inherit; color: inherit; }
   const keyDir = (l, r, u, d) => ({ x: (keys.has(r) ? 1 : 0) - (keys.has(l) ? 1 : 0), y: (keys.has(d) ? 1 : 0) - (keys.has(u) ? 1 : 0) });
   function applyKeys(dt) {
     if (!keys.size) return;
-    if (isPvp()) {
+    if (isLocalPvp()) {
       // player 1: WASD, player 2: arrow keys; both move the way the key points on screen
       const k1 = keyDir('KeyA', 'KeyD', 'KeyW', 'KeyS'), k2 = keyDir('ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown');
       const d1 = keyToWorld(k1.x, k1.y), d2 = keyToWorld(k2.x, k2.y);
@@ -1316,11 +1385,13 @@ button { font: inherit; color: inherit; }
     try { localStorage.setItem('r11-bestof', String(bestOf)); } catch (e) { /* ignore */ }
   }
   function setMode(m) {
-    modeKey = m === 'pvp' ? 'pvp' : 'cpu';
+    if (net.role) return; // can't switch modes while in a room
+    modeKey = m === 'pvp' || m === 'online' ? m : 'cpu';
     for (const b of $('modes').querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset.mode === modeKey ? 'true' : 'false');
     gameEl.classList.toggle('pvp', modeKey === 'pvp');
+    gameEl.classList.toggle('online', modeKey === 'online');
     try { localStorage.setItem('r11-mode', modeKey); } catch (e) { /* ignore */ }
-    if (!running && game.mode !== modeKey) { game = E.createGame(diffKey, { mode: modeKey }); game.events.length = 0; resetHud(); resize(); }
+    if (!running && game.mode !== menuMode()) { game = E.createGame(diffKey, { mode: menuMode() }); game.events.length = 0; resetHud(); resize(); }
   }
   function setSound(on) {
     soundOn = on; $('snd1').checked = on; $('snd2').checked = on;
@@ -1383,9 +1454,19 @@ button { font: inherit; color: inherit; }
 
   function start() {
     Sound.init();
+    // online: the host starts the next match; the other device asks the host to
+    if (net.role) {
+      if (net.role === 'host') { if (game.phase === 'over' || !running) startOnlineMatch(true); }
+      else { netSend({ t: 'again' }); $('endNote').textContent = '已經通知對方，馬上開始…'; }
+      return;
+    }
     // two-player rematch: the other player serves first
     if (modeKey === 'pvp' && game.mode === 'pvp' && game.phase === 'over') pvpFirst = pvpFirst === 'p' ? 'r' : 'p';
-    game = E.createGame(diffKey, { mode: modeKey, first: modeKey === 'pvp' ? pvpFirst : 'p', bestOf: modeKey === 'pvp' ? bestOf : 1 });
+    beginPlay(E.createGame(diffKey, { mode: menuMode(), first: modeKey === 'pvp' ? pvpFirst : 'p', bestOf: modeKey === 'pvp' ? bestOf : 1 }));
+  }
+  // a new match on this screen (also used by both devices when an online match starts)
+  function beginPlay(g) {
+    game = g;
     game.events.length = 0;
     input.tx = 0; input.tz = PAD.restZ; game.pad.tx = 0; game.pad.tz = PAD.restZ;
     input2.tx = 0; input2.tz = -PAD.restZ; game.pad2.tx = 0; game.pad2.tz = -PAD.restZ;
@@ -1393,35 +1474,44 @@ button { font: inherit; color: inherit; }
     running = true; paused = false; pointsPlayed = 0; trail.length = 0; fx.length = 0; queued = null;
     $('menu').hidden = true; $('pauseMenu').hidden = true; $('endMenu').hidden = true; $('banner').hidden = true;
     gameEl.classList.add('playing');
+    setPauseNote('');
     resetHud();
-    banner('比賽開始', isPvp() ? `${nameOf(game.server)} 先發球` : game.server === 'p' ? '你先發球' : 'R-11 先發球', '', 1100);
+    banner('比賽開始', isLocalPvp() ? `${nameOf(game.server)} 先發球` : game.server === 'p' ? '你先發球' : `${nameSp('r')}先發球`, '', 1100);
   }
-  function pause() {
+  // fromNet: the other device paused (online), so don't tell it again
+  function pause(fromNet) {
     if (!running || paused || game.phase === 'over') return;
     paused = true; keys.clear(); releaseTouches();
+    if (net.role && fromNet !== true) { netSend({ t: 'pause' }); net.psHold = performance.now() + 1200; }
     $('pauseScore').textContent = isPvp()
-      ? `${game.match.bestOf > 1 ? `第 ${game.match.gameNo} 局（局數 ${game.match.games.p}:${game.match.games.r}）　` : ''}比分 玩家 1 ${game.score.p} : ${game.score.r} 玩家 2　·　球速${game.diff.name}`
+      ? `${game.match.bestOf > 1 ? `第 ${game.match.gameNo} 局（局數 ${game.match.games.p}:${game.match.games.r}）　` : ''}比分 ${nameOf('p')} ${game.score.p} : ${game.score.r} ${nameOf('r')}　·　球速${game.diff.name}`
       : `比分 你 ${game.score.p} : ${game.score.r} R-11　·　${game.diff.name}`;
     $('pauseMenu').hidden = false; gameEl.classList.remove('playing'); $('bResume').focus();
   }
-  function resume() { paused = false; $('pauseMenu').hidden = true; gameEl.classList.add('playing'); Sound.init(); last = performance.now(); }
+  function resume(fromNet) {
+    if (net.role && net.state !== 'playing') return; // online: wait until the other device is back
+    paused = false; $('pauseMenu').hidden = true; gameEl.classList.add('playing'); Sound.init(); last = performance.now();
+    if (net.role && fromNet !== true) { netSend({ t: 'resume' }); net.psHold = performance.now() + 1200; }
+  }
   function toMenu() {
+    if (net.role) { netSend({ t: 'bye' }); resetNet(); }
     running = false; paused = false;
     $('pauseMenu').hidden = true; $('endMenu').hidden = true; $('menu').hidden = false; gameEl.classList.remove('playing');
-    game = E.createGame(diffKey, { mode: modeKey }); game.events.length = 0; resetHud(); $('bStart').focus();
+    game = E.createGame(diffKey, { mode: menuMode() }); game.events.length = 0; resetHud(); setLobby('idle', '');
+    (modeKey === 'online' ? $('bHost') : $('bStart')).focus();
   }
 
   $('modes').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
   $('bestOfs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setBestOf(Number(b.dataset.best)); });
   $('diffs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setDiff(b.dataset.diff); });
   $('bStart').addEventListener('click', start);
-  $('bServe').addEventListener('click', () => tryServe(isPvp() ? game.server : 'p'));
+  $('bServe').addEventListener('click', () => tryServe(isLocalPvp() ? game.server : 'p'));
   $('bPause').addEventListener('click', () => (paused ? resume() : pause()));
-  $('bResume').addEventListener('click', resume);
+  $('bResume').addEventListener('click', () => resume());
   $('bRestart').addEventListener('click', start);
-  $('bMenu').addEventListener('click', toMenu);
+  $('bMenu').addEventListener('click', () => toMenu());
   $('bAgain').addEventListener('click', start);
-  $('bChange').addEventListener('click', toMenu);
+  $('bChange').addEventListener('click', () => toMenu());
   $('snd1').addEventListener('change', (e) => setSound(e.target.checked));
   $('snd2').addEventListener('change', (e) => setSound(e.target.checked));
   // turning sound back on answers with a tick; turning vibration on answers with a short buzz
@@ -1431,6 +1521,253 @@ button { font: inherit; color: inherit; }
   gameEl.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && b.id !== 'bServe') { Sound.init(); Sound.click(); } });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
+  // ---------------- online: two devices (Issue #11, option A: WebRTC through PeerJS) ----------------
+  // The device that creates the room (host) runs the engine in two-player mode as 'p'. The one that joins is 'r'
+  // on the host, but online.js turns every snapshot around so it also sees itself at the near end as 'p'.
+  // PeerJS only introduces the two devices (free public server); after that the phones talk directly.
+  const ON = window.R11Online;
+  const PEER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js';
+  const PEER_SRI = 'sha384-x0YgkOr/3UOZP2CRDxGW9e0Q+2Qjyr3uJrm4xU32Y7ZCNAo7Cc7bjhrZMi/dwczu';
+  const LOST_SECS = 30; // how long to wait for the other device after the connection drops
+  let peerLoading = null;
+  // PeerJS is loaded only when someone opens or joins a room, so the rest of the game works offline and from file://
+  function loadPeer() {
+    if (window.Peer) return Promise.resolve();
+    if (!peerLoading) {
+      peerLoading = new Promise((ok, fail) => {
+        const sc = document.createElement('script');
+        sc.src = PEER_SRC; sc.integrity = PEER_SRI; sc.crossOrigin = 'anonymous'; sc.async = true;
+        const t = setTimeout(() => fail(new Error('timeout')), 15000);
+        sc.onload = () => { clearTimeout(t); if (window.Peer) ok(); else fail(new Error('no Peer')); };
+        sc.onerror = () => { clearTimeout(t); fail(new Error('load')); };
+        document.head.append(sc);
+      }).catch((err) => { peerLoading = null; throw err; });
+    }
+    return peerLoading;
+  }
+  function netSend(m) { const c = net.conn; if (c && c.open) { try { c.send(m); } catch (e) { /* closing */ } } }
+  const netTag = () => `連線 · ${(E.DIFFS[net.diff] || game.diff).name}${net.rtt ? ` · ${Math.round(net.rtt)} ms` : ''}`;
+  // lobby states: idle (create / join buttons), opening, waiting (room number shown), connecting
+  function setLobby(state, text, err) {
+    const busy = state === 'opening' || state === 'connecting' || state === 'waiting';
+    $('lobbyStart').hidden = busy; $('lobbyRoom').hidden = state !== 'waiting'; $('bLeave').hidden = !busy;
+    const st = $('lobbyStatus'); st.textContent = text || ''; st.classList.toggle('err', !!err);
+  }
+  // the red line in the pause menu while the other device is gone; 繼續 waits until it is back
+  function setPauseNote(text) { $('pauseNet').textContent = text; $('pauseNet').hidden = !text; $('bResume').disabled = !!text; }
+  function errText(err) {
+    const t = err && err.type;
+    if (t === 'peer-unavailable') return '找不到這個房號。請確認房號，或請對方重新建立房間。';
+    if (t === 'browser-incompatible') return '這個瀏覽器不支援連線對戰，請換 Chrome、Safari 或 Edge。';
+    if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') return '連不上配對伺服器，請確認網路後再試一次。';
+    return '連線失敗，請再試一次。';
+  }
+  function resetNet() {
+    const c = net.conn, p = net.peer;
+    net.conn = null; net.peer = null; net.role = null; net.state = 'idle'; net.code = ''; net.out.length = 0; net.rtt = 0;
+    net.oppSkin = ''; net.remote.tx = 0; net.remote.tz = -PAD.restZ; net.dialAt = 0;
+    try { if (c) c.close(); } catch (e) { /* ignore */ }
+    try { if (p) p.destroy(); } catch (e) { /* ignore */ }
+  }
+  function lobbyFail(text) { resetNet(); setLobby('idle', text, true); }
+  // the other device left (or never came back): back to the menu with a message
+  function remoteLeft(text) {
+    resetNet();
+    toMenu();
+    setLobby('idle', text, true);
+  }
+
+  async function hostRoom() {
+    if (net.role) return;
+    Sound.init();
+    net.role = 'host'; net.state = 'opening'; net.diff = diffKey; net.bestOf = bestOf;
+    setLobby('opening', '正在建立房間…');
+    try { await loadPeer(); } catch (e) { lobbyFail('無法載入連線元件，請確認有連上網路。'); return; }
+    if (net.role === 'host') openRoom(0);
+  }
+  function openRoom(tries) {
+    const code = ON.newCode(), peer = new window.Peer(ON.roomId(code), { debug: 0 });
+    net.peer = peer;
+    peer.on('open', () => {
+      if (net.peer !== peer) return;
+      net.code = code; net.state = 'waiting';
+      $('roomCode').textContent = code;
+      const link = /^https?:$/.test(location.protocol) ? `${location.origin}${location.pathname}?room=${code}` : '';
+      $('roomLink').value = link; $('linkRow').hidden = !link;
+      setLobby('waiting', '等待對手加入…');
+    });
+    peer.on('connection', (c) => {
+      if (net.peer !== peer) return;
+      if (net.state === 'playing') { c.on('open', () => { try { c.send({ t: 'bye', why: 'full' }); } catch (e) { /* ignore */ } setTimeout(() => c.close(), 500); }); return; }
+      wireConn(c);
+    });
+    peer.on('disconnected', () => { if (net.peer === peer && !peer.destroyed) { try { peer.reconnect(); } catch (e) { /* retried later */ } } });
+    peer.on('error', (err) => {
+      if (net.peer !== peer) return;
+      if (err.type === 'unavailable-id' && tries < 6) { net.peer = null; try { peer.destroy(); } catch (e) { /* ignore */ } openRoom(tries + 1); return; }
+      if (net.state === 'playing' || net.state === 'lost') return; // the match goes on over the direct link
+      lobbyFail(errText(err));
+    });
+  }
+  async function joinRoom() {
+    if (net.role) return;
+    const code = $('joinCode').value.trim();
+    if (!ON.validCode(code)) { setLobby('idle', '請輸入 4 位數字的房號。', true); $('joinCode').focus(); return; }
+    Sound.init();
+    net.role = 'join'; net.state = 'connecting'; net.code = code; net.dialAt = performance.now();
+    setLobby('connecting', `正在連到房間 ${code}…`);
+    try { await loadPeer(); } catch (e) { lobbyFail('無法載入連線元件，請確認有連上網路。'); return; }
+    if (net.role !== 'join') return;
+    const peer = new window.Peer({ debug: 0 });
+    net.peer = peer;
+    peer.on('open', () => { if (net.peer === peer) dial(); });
+    peer.on('disconnected', () => { if (net.peer === peer && !peer.destroyed) { try { peer.reconnect(); } catch (e) { /* retried later */ } } });
+    peer.on('error', (err) => {
+      if (net.peer !== peer) return;
+      if (net.state === 'playing' || net.state === 'lost') return; // keep retrying until the 30 seconds run out
+      lobbyFail(errText(err));
+    });
+  }
+  function dial() {
+    const p = net.peer;
+    if (!p || p.destroyed || p.disconnected) return;
+    wireConn(p.connect(ON.roomId(net.code), { reliable: true, serialization: 'json' }));
+  }
+  function wireConn(c) {
+    c.on('open', () => {
+      if (!net.role) { c.close(); return; }
+      if (net.conn && net.conn !== c) { const old = net.conn; net.conn = null; try { old.close(); } catch (e) { /* ignore */ } }
+      net.conn = c; net.lastMsg = performance.now();
+      if (net.role === 'join') netSend({ t: 'hello', v: ON.VERSION, skin: skinId });
+    });
+    c.on('data', (m) => { if (c === net.conn) onNetMsg(m); });
+    c.on('close', () => { if (c === net.conn) connLost(); });
+    c.on('error', () => { if (c === net.conn) connLost(); });
+  }
+  const matchInfo = () => ({ v: ON.VERSION, skin: skinId, diff: net.diff, bestOf: net.bestOf, first: game.first });
+  function onNetMsg(m) {
+    if (!m || typeof m !== 'object') return;
+    net.lastMsg = performance.now();
+    if (net.state === 'lost' && m.t !== 'bye') { // the same link came back (for example after the screen was off)
+      net.state = 'playing'; setPauseNote('');
+      if (net.role === 'host') netSend(Object.assign({ t: 'rejoin' }, matchInfo()));
+    }
+    if (m.t === 'ping') { netSend({ t: 'pong', c: m.c }); return; }
+    if (m.t === 'pong') { const r = performance.now() - Number(m.c); if (r >= 0 && r < 10000) net.rtt = net.rtt ? net.rtt * 0.7 + r * 0.3 : r; return; }
+    if (m.t === 'bye') {
+      remoteLeft(m.why === 'full' ? '這個房間已經有人在打了。' : m.why === 'version' ? '兩邊的遊戲版本不同，請兩支手機都重新整理頁面再試。' : '對方離開了房間。');
+      return;
+    }
+    if (net.role === 'host') {
+      if (m.t === 'hello') {
+        if (m.v !== ON.VERSION) { netSend({ t: 'bye', why: 'version' }); const c = net.conn; net.conn = null; setTimeout(() => { try { c.close(); } catch (e) { /* ignore */ } }, 300); return; }
+        net.oppSkin = SK.byId[m.skin] ? m.skin : '';
+        if (running && game.mode === 'pvp') { net.state = 'playing'; setPauseNote(''); netSend(Object.assign({ t: 'rejoin' }, matchInfo())); return; } // came back
+        net.state = 'playing'; startOnlineMatch(false); return;
+      }
+      if (m.t === 'i') { const p = ON.readInput(m, PAD); if (p) { net.remote.tx = p.tx; net.remote.tz = p.tz; } return; }
+      if (m.t === 'serve') { if (running && !paused && game.phase === 'serveWait' && game.server === 'r') E.serve(game, 'r'); return; }
+      if (m.t === 'pause') { pause(true); return; }
+      if (m.t === 'resume') { resume(true); return; }
+      if (m.t === 'again') { if (game.phase === 'over') startOnlineMatch(true); return; }
+      return;
+    }
+    if (m.t === 's') { onSnapshot(m); return; }
+    if (m.t === 'start' || m.t === 'rejoin') { onStart(m); return; }
+    // the host paused or carried on (the snapshots say so too; this is just quicker)
+    if (m.t === 'pause') { net.psHold = performance.now() + 600; pause(true); return; }
+    if (m.t === 'resume') { net.psHold = performance.now() + 600; resume(true); }
+  }
+  // host: a new match; a rematch lets the other player serve first
+  function startOnlineMatch(rematch) {
+    pvpFirst = rematch ? (pvpFirst === 'p' ? 'r' : 'p') : 'p';
+    net.remote.tx = 0; net.remote.tz = -PAD.restZ; net.out.length = 0;
+    beginPlay(E.createGame(net.diff, { mode: 'pvp', first: pvpFirst, bestOf: net.bestOf }));
+    netSend(Object.assign({ t: 'start' }, matchInfo()));
+  }
+  // joiner: the host started a match, or we came back to one after the link dropped (rejoin)
+  function onStart(m) {
+    if (m.v !== ON.VERSION) { remoteLeft('兩邊的遊戲版本不同，請兩支手機都重新整理頁面再試。'); return; }
+    net.oppSkin = SK.byId[m.skin] ? m.skin : '';
+    if (E.DIFFS[m.diff]) net.diff = m.diff;
+    if (E.BEST_OF.includes(m.bestOf)) net.bestOf = m.bestOf;
+    net.state = 'playing'; setPauseNote('');
+    if (m.t === 'rejoin' && running && game.mode === 'pvp') return;
+    beginPlay(E.createGame(net.diff, { mode: 'pvp', first: m.first === 'r' ? 'p' : 'r', bestOf: net.bestOf }));
+  }
+  // joiner: a snapshot from the host, already turned around to our side
+  function onSnapshot(sn) {
+    if (!running || game.mode !== 'pvp') return;
+    const evs = ON.applySnapshot(game, sn);
+    if (!evs) return;
+    for (const e of evs) game.events.push(e);
+    ON.extrapolate(E, game, Math.min(0.1, net.rtt / 2000)); // it left the host half a round trip ago
+    net.fresh = true;
+    // pausing follows the host, unless we just asked it to change
+    if (performance.now() > net.psHold && net.state === 'playing') { if (sn.ps && !paused) pause(true); else if (!sn.ps && paused) resume(true); }
+  }
+  // joiner, every frame: our paddle answers the finger at once; the ball keeps flying until the next snapshot
+  function joinerStep(dt) {
+    E.movePad(game.pad, dt, PAD.zMin, PAD.zMax);
+    if (net.fresh) net.fresh = false; else ON.extrapolate(E, game, dt);
+    const r = game.robot;
+    if (r.moodT > 0) { r.moodT -= dt; if (r.moodT <= 0) r.mood = 'idle'; }
+    netSend(ON.inputMsg(input.tx, input.tz));
+  }
+  // host, every frame: keep this frame's events for the snapshot; draw the other player where their paddle is
+  function hostStep() {
+    for (const e of game.events) net.out.push(e);
+    const r = game.robot, o = game.pad2;
+    r.x = o.x; r.y = o.y; r.z = o.z; r.swing = o.swing;
+  }
+  function hostSend() {
+    if (!running || !net.conn || !net.conn.open) return;
+    netSend(ON.snapshot(game, net.out, paused));
+    net.out.length = 0;
+  }
+  function connLost() {
+    if (net.state === 'playing') {
+      net.state = 'lost'; net.lostAt = performance.now(); net.retryAt = 0;
+      if (running && !paused && game.phase !== 'over') pause(true);
+      setPauseNote('對方斷線了，等待重新連線…');
+      if (game.phase === 'over') banner('對方斷線了', '等待重新連線…', 'neutral', 2000);
+    } else if (net.role === 'join' && net.state === 'connecting') lobbyFail('連線中斷了，請再試一次。');
+    else if (net.role === 'host' && net.state === 'waiting') net.conn = null; // keep waiting for someone else
+  }
+  // once a second, also in a background tab: ping, notice a silent link, count down a lost one, retry
+  setInterval(() => {
+    if (!net.role) return;
+    const now = performance.now();
+    if (net.conn && net.conn.open) netSend({ t: 'ping', c: now });
+    if (net.state === 'playing' && now - net.lastMsg > 6000) connLost();
+    if (net.state === 'connecting' && net.dialAt && now - net.dialAt > 20000) { lobbyFail('連不上對方。可能是網路擋住了直連，試試兩支手機連同一個 Wi-Fi。'); return; }
+    if (net.state === 'lost') {
+      const left = Math.ceil(LOST_SECS - (now - net.lostAt) / 1000);
+      if (left <= 0) { remoteLeft('連線中斷了，對方沒有回來。'); return; }
+      setPauseNote(`對方斷線了，等待重新連線…（${left} 秒）`);
+      if (net.role === 'join' && now > net.retryAt) {
+        net.retryAt = now + 2500;
+        const p = net.peer;
+        if (p && p.disconnected && !p.destroyed) { try { p.reconnect(); } catch (e) { /* next time */ } } else dial();
+      }
+    }
+    if (running) $('diffTag').textContent = netTag();
+  }, 1000);
+  window.addEventListener('pagehide', () => { if (net.role) netSend({ t: 'bye' }); });
+
+  $('bHost').addEventListener('click', hostRoom);
+  $('bJoin').addEventListener('click', joinRoom);
+  $('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); joinRoom(); } });
+  $('joinCode').addEventListener('input', (e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); if (v !== e.target.value) e.target.value = v; });
+  $('bLeave').addEventListener('click', () => { netSend({ t: 'bye' }); resetNet(); setLobby('idle', ''); });
+  $('bCopyLink').addEventListener('click', () => {
+    const link = $('roomLink').value;
+    if (navigator.share) { navigator.share({ title: 'R-11 桌球對決', text: `來跟我連線打桌球，房號 ${net.code}`, url: link }).catch(() => { /* cancelled */ }); return; }
+    const done = () => { $('bCopyLink').textContent = '已複製'; setTimeout(() => { $('bCopyLink').textContent = '複製連結'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, () => { $('roomLink').select(); });
+    else $('roomLink').select();
+  });
+
   // ---------------- loop ----------------
   let last = performance.now();
   function frame(now) {
@@ -1438,8 +1775,13 @@ button { font: inherit; color: inherit; }
     if (running && !paused) {
       applyKeys(dt);
       game.pad.tx = input.tx; game.pad.tz = input.tz;
-      game.pad2.tx = input2.tx; game.pad2.tz = input2.tz;
-      E.update(game, dt);
+      if (net.role === 'join') joinerStep(dt); // online, joined: the host runs the game, we only draw it
+      else {
+        if (net.role === 'host') { game.pad2.tx = net.remote.tx; game.pad2.tz = net.remote.tz; }
+        else { game.pad2.tx = input2.tx; game.pad2.tz = input2.tz; }
+        E.update(game, dt);
+        if (net.role === 'host') hostStep();
+      }
       handleEvents();
       const b = game.ball;
       if ((game.phase === 'rally' || game.phase === 'serve') && Math.hypot(b.vx, b.vz) > 1) { trail.push([b.x, b.y, b.z]); if (trail.length > 7) trail.shift(); }
@@ -1448,6 +1790,7 @@ button { font: inherit; color: inherit; }
       game.robot.x = Math.sin(now / 1600) * 0.25; game.robot.y = 0.22 + Math.sin(now / 700) * 0.03;
       game.pad.x += (input.tx - game.pad.x) * 0.2; game.pad.z += (input.tz - game.pad.z) * 0.2;
     }
+    if (net.role === 'host') hostSend();
     render(now, dt);
     drawThumbs(now);
     updateTip();
@@ -1619,6 +1962,7 @@ button { font: inherit; color: inherit; }
     buildPicker('skinsMenu', 'skinDescMenu'); buildPicker('skinsPause', 'skinDescPause');
     setDiff(diffKey); setSound(soundOn); setSkin(skinId, false); setMode(modeKey); setBestOf(bestOf);
     setVibe(vibeOn, false);
+    if (roomParam) { $('joinCode').value = roomParam; setLobby('idle', `按「加入房間」進入房間 ${roomParam}`); }
     if (!canVibrate) for (const id of ['vib1', 'vib2']) $(id).closest('label').hidden = true;
     new ResizeObserver(resize).observe(gameEl);
     resize();
